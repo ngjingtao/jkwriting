@@ -1,0 +1,211 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { DEFAULT_CONFIG } from './defaults.js';
+
+export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
+const STORE_FILE = path.join(DATA_DIR, 'store.json');
+const GIST_FILE = 'writing-fun-config.json';
+
+const GIST_ID = process.env.GIST_ID || '';
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
+
+let cache = null;
+export const syncState = {
+  gist: Boolean(GIST_ID && GITHUB_TOKEN),
+  lastSyncAt: 0,
+  lastError: '',
+};
+
+/* ------------------------------------------------------------------ */
+/* Validation                                                          */
+/* ------------------------------------------------------------------ */
+
+const clampNum = (v, def, min, max) =>
+  Number.isFinite(Number(v)) ? Math.min(max, Math.max(min, Number(v))) : def;
+
+const oneOf = (v, list, def) => (list.includes(v) ? v : def);
+
+const bool = (v, def) => (typeof v === 'boolean' ? v : def);
+
+const cleanText = (v, max) =>
+  String(v ?? '')
+    .replace(/[\u0000-\u001f\u007f]/g, '')
+    .trim()
+    .slice(0, max);
+
+function cleanItem(raw) {
+  if (!raw) return null;
+  const text = cleanText(typeof raw === 'string' ? raw : raw.text, 24);
+  if (!text) return null;
+  const item = { text };
+  const meaning = cleanText(raw.meaning, 80);
+  if (meaning) item.meaning = meaning;
+  const pinyin = cleanText(raw.pinyin, 40);
+  if (pinyin) item.pinyin = pinyin;
+  return item;
+}
+
+function cleanSet(raw, index) {
+  if (!raw) return null;
+  const name = cleanText(raw.name, 40) || `Set ${index + 1}`;
+  const lang = oneOf(raw.lang, ['zh', 'en', 'bm'], 'en');
+  const items = [];
+  const seen = new Set();
+  for (const entry of Array.isArray(raw.items) ? raw.items.slice(0, 300) : []) {
+    const item = cleanItem(entry);
+    if (!item || seen.has(item.text)) continue;
+    seen.add(item.text);
+    items.push(item);
+  }
+  if (!items.length) return null;
+  const id =
+    cleanText(raw.id, 48).replace(/[^a-zA-Z0-9_-]/g, '') ||
+    `set-${crypto.randomBytes(4).toString('hex')}`;
+  return { id, lang, name, enabled: raw.enabled !== false, items };
+}
+
+export function sanitizeConfig(raw) {
+  const base = structuredClone(DEFAULT_CONFIG);
+  const src = raw && typeof raw === 'object' ? raw : {};
+  const practice = src.practice && typeof src.practice === 'object' ? src.practice : {};
+  const scoring = src.scoring && typeof src.scoring === 'object' ? src.scoring : {};
+  const app = src.app && typeof src.app === 'object' ? src.app : {};
+
+  const sets = [];
+  const ids = new Set();
+  for (const [i, rawSet] of (Array.isArray(src.sets) ? src.sets.slice(0, 60) : []).entries()) {
+    const set = cleanSet(rawSet, i);
+    if (!set) continue;
+    if (ids.has(set.id)) set.id = `${set.id}-${crypto.randomBytes(2).toString('hex')}`;
+    ids.add(set.id);
+    sets.push(set);
+  }
+
+  const inkColor = /^#[0-9a-fA-F]{6}$/.test(String(practice.inkColor || ''))
+    ? String(practice.inkColor)
+    : base.practice.inkColor;
+
+  return {
+    version: 1,
+    app: {
+      title: cleanText(app.title, 40) || base.app.title,
+      uiLang: oneOf(app.uiLang, ['en', 'zh', 'ms'], base.app.uiLang),
+    },
+    practice: {
+      mode: oneOf(practice.mode, ['trace', 'copy', 'memory'], base.practice.mode),
+      gridHanzi: oneOf(practice.gridHanzi, ['tian', 'mi', 'none'], base.practice.gridHanzi),
+      gridLatin: oneOf(practice.gridLatin, ['lines', 'none'], base.practice.gridLatin),
+      guideOpacity: clampNum(practice.guideOpacity, base.practice.guideOpacity, 0.04, 0.75),
+      inkWidth: clampNum(practice.inkWidth, base.practice.inkWidth, 0.02, 0.12),
+      inkColor,
+      boxScale: clampNum(practice.boxScale, base.practice.boxScale, 0.45, 1),
+      showPinyin: bool(practice.showPinyin, base.practice.showPinyin),
+      showMeaning: bool(practice.showMeaning, base.practice.showMeaning),
+      showNumbers: bool(practice.showNumbers, base.practice.showNumbers),
+      autoNext: bool(practice.autoNext, base.practice.autoNext),
+      sound: bool(practice.sound, base.practice.sound),
+      penOnly: bool(practice.penOnly, base.practice.penOnly),
+    },
+    scoring: {
+      tolerance: oneOf(scoring.tolerance, ['lenient', 'normal', 'strict'], base.scoring.tolerance),
+      threshold: clampNum(scoring.threshold, base.scoring.threshold, 0.2, 0.95),
+      showTips: bool(scoring.showTips, base.scoring.showTips),
+    },
+    sets: sets.length ? sets : base.sets,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* Gist sync (optional, for Render free plan)                          */
+/* ------------------------------------------------------------------ */
+
+async function gistRequest(method, body) {
+  const res = await fetch(`https://api.github.com/gists/${GIST_ID}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${GITHUB_TOKEN}`,
+      Accept: 'application/vnd.github+json',
+      'Content-Type': 'application/json',
+      'User-Agent': 'writing-fun',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(12000),
+  });
+  if (!res.ok) throw new Error(`GitHub ${res.status}`);
+  return res.json();
+}
+
+async function gistLoad() {
+  if (!syncState.gist) return null;
+  try {
+    const data = await gistRequest('GET');
+    const file = data.files?.[GIST_FILE];
+    if (!file) return null;
+    const text = file.truncated ? await (await fetch(file.raw_url)).text() : file.content;
+    syncState.lastSyncAt = Date.now();
+    syncState.lastError = '';
+    return JSON.parse(text);
+  } catch (err) {
+    syncState.lastError = err.message;
+    console.warn('[store] gist load failed:', err.message);
+    return null;
+  }
+}
+
+async function gistSave(config) {
+  if (!syncState.gist) return;
+  try {
+    await gistRequest('PATCH', {
+      files: { [GIST_FILE]: { content: JSON.stringify(config, null, 2) } },
+    });
+    syncState.lastSyncAt = Date.now();
+    syncState.lastError = '';
+  } catch (err) {
+    syncState.lastError = err.message;
+    console.warn('[store] gist save failed:', err.message);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Public API                                                          */
+/* ------------------------------------------------------------------ */
+
+async function readDisk() {
+  try {
+    return JSON.parse(await fs.readFile(STORE_FILE, 'utf8'));
+  } catch {
+    return null;
+  }
+}
+
+export async function loadConfig() {
+  if (cache) return cache;
+  let raw = await readDisk();
+  if (!raw) raw = await gistLoad();
+  cache = sanitizeConfig(raw || DEFAULT_CONFIG);
+  if (!raw) {
+    // Persist the defaults so the admin page has a stable file to edit.
+    await writeDisk(cache).catch(() => {});
+  }
+  return cache;
+}
+
+async function writeDisk(config) {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  const tmp = `${STORE_FILE}.${process.pid}.tmp`;
+  await fs.writeFile(tmp, JSON.stringify(config, null, 2));
+  await fs.rename(tmp, STORE_FILE);
+}
+
+export async function saveConfig(raw) {
+  const config = sanitizeConfig(raw);
+  cache = config;
+  await writeDisk(config);
+  await gistSave(config);
+  return config;
+}
+
+export async function resetConfig() {
+  return saveConfig(structuredClone(DEFAULT_CONFIG));
+}

@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: writing-fun
+    runtime: node
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: ADMIN_PIN
+        sync: false
+      # Optional: keep settings across redeploys on the free plan.
+      # Create a secret gist, then set these two variables in Render.
+      - key: GIST_ID
+        sync: false
+      - key: GITHUB_TOKEN
+        sync: false

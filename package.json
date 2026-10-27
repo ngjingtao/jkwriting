@@ -1,0 +1,20 @@
+{
+  "name": "jk-writing",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Kid-friendly handwriting practice for iPad — Chinese and English/BM with stroke guides and automatic scoring.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js",
+    "icons": "node scripts/make-icons.mjs",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "pinyin-pro": "^3.26.0"
+  }
+}
