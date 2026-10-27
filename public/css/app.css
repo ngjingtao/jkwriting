@@ -448,6 +448,9 @@ p {
   font-weight: 750;
   letter-spacing: 0.02em;
   white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .p-word .cur {
