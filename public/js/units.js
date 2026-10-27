@@ -1,4 +1,4 @@
-import { latinStrokes } from './glyphs.js';
+import { fittedLatinStrokes, ensureLatinFont } from './fontfit.js';
 import { fetchHanzi } from './api.js';
 
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
@@ -73,8 +73,9 @@ export async function buildUnits(item, lang) {
     };
   }
 
+  await ensureLatinFont();
   for (const ch of chars) {
-    const strokes = latinStrokes(ch);
+    const strokes = fittedLatinStrokes(ch);
     if (!strokes) {
       header.push({ ch, unitIndex: -1 });
       continue;

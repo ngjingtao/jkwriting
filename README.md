@@ -166,7 +166,8 @@ public/
     practice.js   Tokens, rounds, guided strokes, speech, results
     surface.js    Canvas: paper, grids, ghost strokes, arrows, ink, demo
     scoring.js    Geometry + scoring (tested)
-    glyphs.js     Hand-authored Latin alphabet + digits (stroke order)
+    glyphs.js     Generated Hershey stroke data (run `npm run glyphs`)
+    fontfit.js    Fits each Latin skeleton to the Didact glyph box
     units.js      Words / passages → practice tokens and units
     speech.js     Read-aloud with per-script voices
     i18n.js       English / 中文 / Bahasa Melayu UI strings
@@ -195,7 +196,7 @@ render.yaml
 
 - **Fonts**: the UI uses **Nunito**; the English model text and ghost letters use **Didact Gothic**, a clean Arial-like face with the single-storey handwritten `a` children write. The tracing skeletons come from the public-domain **Hershey Sans 1-stroke** font. Nunito and Didact are self-hosted in `public/fonts/` (Latin + Latin-ext subsets) under the SIL Open Font License — see `public/fonts/OFL-*.txt`. `npm run fonts` re-downloads them.
 - **Chinese stroke data** comes from [`hanzi-writer-data`](https://github.com/chanind/hanzi-writer-data) via jsDelivr/unpkg. It is cached in `data/hanzi/` on the server and in the browser, so the app works offline after first use. Rare characters may not exist in the dataset — the app shows a friendly message instead of breaking.
-- **Latin stroke guides** are generated from the public-domain **Hershey Sans 1-stroke** font by `npm run glyphs` (`scripts/make-glyphs.mjs`). The letterforms are clean, Arial-like skeletons with the single-storey `a`/`g` and real teaching order (E is four strokes, T starts with the bar, and so on). The light ghost letter is drawn in Didact Gothic, so the model word, outline and direction arrows all agree.
+- **Latin stroke guides** are generated from the public-domain **Hershey Sans 1-stroke** font by `npm run glyphs` (`scripts/make-glyphs.mjs`). At runtime `public/js/fontfit.js` fits each skeleton to the **actual Didact ink box** the browser draws — including descenders like `y`, `g`, `j`, `p`, `q` — so the light ghost letter, the model word and the direction arrows line up. The four-line grid is measured from the same font metrics. Letterforms are clean, Arial-like skeletons with the single-storey `a`/`g` and real teaching order (E is four strokes, T starts with the bar, and so on).
 - **BM** uses the same Latin engine; only the word lists differ.
 - **Speech** uses the voices already on the iPad. If no Mandarin voice is installed, go to iPad **Settings → Accessibility → Spoken Content → Voices → Chinese** and download one.
 - **Wade-Giles** is generated from Hanyu Pinyin with the standard syllabary; rare characters or polyphonic characters use `pinyin-pro`'s default reading.

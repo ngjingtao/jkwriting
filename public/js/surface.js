@@ -1,4 +1,5 @@
 import { pathLength } from './scoring.js';
+import { LATIN_SIZE_RATIO, LATIN_BASELINE, LATIN_FAMILY, latinMetrics } from './fontfit.js';
 
 const ACCENT = '#4f46e5';
 const RED = '#ef4444';
@@ -72,10 +73,10 @@ export class WritingSurface {
     this._raf = 0;
     this._hintTimer = 0;
     this._font = getComputedStyle(document.body).fontFamily;
-    this._latinFamily = "'Didact Gothic', 'Nunito', sans-serif";
+    this._latinFamily = LATIN_FAMILY;
     if (document.fonts?.load) {
       document.fonts
-        .load('400 100px "Didact Gothic"')
+        .load(`400 100px ${LATIN_FAMILY}`)
         .then(() => this.redraw())
         .catch(() => {});
     }
@@ -440,10 +441,10 @@ export class WritingSurface {
       ctx.strokeRect(x + size * 0.035, y + size * 0.035, size * 0.93, size * 0.93);
     } else {
       const lines = [
-        { at: 0.17, solid: false },
-        { at: 0.35, solid: false },
-        { at: 0.765, solid: true },
-        { at: 0.95, solid: false },
+        { at: latinMetrics().capTop, solid: false },
+        { at: latinMetrics().xTop, solid: false },
+        { at: LATIN_BASELINE, solid: true },
+        { at: latinMetrics().descBottom, solid: false },
       ];
       for (const line of lines) {
         ctx.strokeStyle = line.solid ? GRID_STRONG : GRID;
@@ -541,14 +542,14 @@ export class WritingSurface {
 
   _drawLatinText(ctx, text, color, alpha) {
     const size = this.box.size;
-    const fontSize = size * 0.86; // matches the Didact cap height / baseline used below
+    const fontSize = size * LATIN_SIZE_RATIO;
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
     ctx.font = `400 ${fontSize}px ${this._latinFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText(text || '', this.box.x + size / 2, this.box.y + size * 0.765);
+    ctx.fillText(text || '', this.box.x + size / 2, this.box.y + size * LATIN_BASELINE);
     ctx.restore();
   }
 
