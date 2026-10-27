@@ -128,8 +128,8 @@ export const GLYPHS = {
     [[0.05, 0.5], [0.38, 0.5]],
   ],
   g: [
-    [[0.46, 0.55], [0.45, 0.72], [0.38, 0.8], [0.24, 0.82], [0.12, 0.78], [0.09, 0.7]],
-    [[0.46, 0.55], [0.46, 0.86], [0.4, 0.93], [0.26, 0.96], [0.13, 0.92]],
+    [[0.46, 0.56], [0.38, 0.51], [0.24, 0.51], [0.11, 0.58], [0.09, 0.7], [0.15, 0.79], [0.29, 0.81], [0.42, 0.76], [0.46, 0.66], [0.46, 0.56]],
+    [[0.46, 0.52], [0.46, 0.86], [0.4, 0.94], [0.26, 0.97], [0.12, 0.93]],
   ],
   h: [
     [[0.1, A], [0.1, B]],
@@ -224,11 +224,16 @@ export const SUPPORTED = new Set(Object.keys(GLYPHS));
 export function latinStrokes(ch) {
   const strokes = GLYPHS[ch] || GLYPHS[ch?.toUpperCase?.()] || null;
   if (!strokes) return null;
-  // Slightly enlarge the glyph so a single letter fills more of the practice box.
-  const S = 1.1;
+  // Enlarge the glyph and lift it off the baseline so it fills the practice box
+  // without looking tall and thin.
+  const SX = 1.16;
+  const SY = 1.1;
   const CX = 0.5;
-  const CY = 0.48;
+  const BASE = 0.8;
   return strokes.map((stroke) =>
-    stroke.map(([x, y]) => [CX + (x + GLYPH_OFFSET - CX) * S, CY + (y - CY) * S]),
+    stroke.map(([x, y]) => [
+      CX + (x + GLYPH_OFFSET - CX) * SX,
+      BASE - (BASE - y) * SY - 0.01,
+    ]),
   );
 }

@@ -187,6 +187,7 @@ render.yaml
 
 ## Notes & limitations
 
+- **Fonts**: the UI uses **Nunito** and handwriting models use **Patrick Hand**. Both are self-hosted in `public/fonts/` (Latin + Latin-ext subsets) under the SIL Open Font License — see `public/fonts/OFL-*.txt`. `npm run fonts` re-downloads them.
 - **Chinese stroke data** comes from [`hanzi-writer-data`](https://github.com/chanind/hanzi-writer-data) via jsDelivr/unpkg. It is cached in `data/hanzi/` on the server and in the browser, so the app works offline after first use. Rare characters may not exist in the dataset — the app shows a friendly message instead of breaking.
 - **Latin letters** are hand-authored in `public/js/glyphs.js`, one stroke list per glyph, in a 0–1 square (cap height 0.14, x-height 0.52, baseline 0.80). Edit them to change the handwriting style.
 - **BM** uses the same Latin engine; only the word lists differ.

@@ -11,6 +11,7 @@
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
     "icons": "node scripts/make-icons.mjs",
+    "fonts": "node scripts/fetch-fonts.mjs",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {

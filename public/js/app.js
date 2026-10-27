@@ -95,7 +95,7 @@ function renderHome() {
   for (const set of sets) {
     const isPassage = set.kind === 'passage';
     const sample = isPassage
-      ? set.items[0].text.slice(0, 90)
+      ? `${set.items[0].text.slice(0, 56)}${set.items[0].text.length > 56 ? '…' : ''}`
       : set.items.slice(0, 8).map((i) => i.text).join(' ');
     const meta = [t('home.words', { n: set.items.length })];
     if (set.repeat > 1) meta.push(`×${set.repeat}`);
