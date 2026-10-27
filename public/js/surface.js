@@ -72,6 +72,13 @@ export class WritingSurface {
     this._raf = 0;
     this._hintTimer = 0;
     this._font = getComputedStyle(document.body).fontFamily;
+    this._latinFamily = "'Didact Gothic', 'Nunito', sans-serif";
+    if (document.fonts?.load) {
+      document.fonts
+        .load('400 100px "Didact Gothic"')
+        .then(() => this.redraw())
+        .catch(() => {});
+    }
 
     this._resize = this._resize.bind(this);
     this._loop = this._loop.bind(this);
@@ -433,9 +440,9 @@ export class WritingSurface {
       ctx.strokeRect(x + size * 0.035, y + size * 0.035, size * 0.93, size * 0.93);
     } else {
       const lines = [
-        { at: 0.14, solid: false },
-        { at: 0.52, solid: false },
-        { at: 0.8, solid: true },
+        { at: 0.17, solid: false },
+        { at: 0.35, solid: false },
+        { at: 0.765, solid: true },
         { at: 0.95, solid: false },
       ];
       for (const line of lines) {
@@ -520,12 +527,33 @@ export class WritingSurface {
   _drawGhost(ctx) {
     if (!this.unit) return;
     const alpha = this.opts.guideOpacity;
+    if (this.unit.script === 'latin') {
+      this._drawLatinText(ctx, this.unit.char, GHOST, Math.min(0.45, alpha * 1.4));
+      return;
+    }
     for (const s of this.unit.strokes) {
       const filled = this._fillHanzi(ctx, s, GHOST, alpha);
       if (!filled) {
         this._strokePolyline(ctx, s.median, this.box.size * this.opts.inkWidth * 0.9, GHOST, alpha);
       }
     }
+  }
+
+  _drawLatinText(ctx, text, color, alpha) {
+    const size = this.box.size;
+    const fontSize = size * 0.86; // matches the Didact cap height / baseline used below
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.font = `400 ${fontSize}px ${this._latinFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(text || '', this.box.x + size / 2, this.box.y + size * 0.765);
+    ctx.restore();
+  }
+
+  get _isLatin() {
+    return this.unit?.script === 'latin';
   }
 
   _drawHint(ctx, t) {
@@ -539,12 +567,24 @@ export class WritingSurface {
     if (flashing) {
       const filled = this._fillHanzi(ctx, stroke, RED, 0.3 + 0.2 * pulse);
       if (!filled) {
-        this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth, RED, 0.35);
+        this._strokePolyline(
+          ctx,
+          stroke.median,
+          size * this.opts.inkWidth * (this._isLatin ? 0.3 : 1),
+          RED,
+          0.35,
+        );
       }
     } else {
       const filled = this._fillHanzi(ctx, stroke, ACCENT, 0.2 + 0.16 * pulse);
       if (!filled) {
-        this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 1.02, ACCENT, 0.22 + 0.14 * pulse);
+        this._strokePolyline(
+          ctx,
+          stroke.median,
+          size * this.opts.inkWidth * (this._isLatin ? 0.34 : 1.02),
+          ACCENT,
+          0.3 + 0.18 * pulse,
+        );
       }
     }
     ctx.restore();
@@ -681,7 +721,13 @@ export class WritingSurface {
       const s = this.unit.strokes[idx];
       const filled = this._fillHanzi(ctx, s, RED, 0.12);
       if (!filled) {
-        this._strokePolyline(ctx, s.median, this.box.size * this.opts.inkWidth * 0.9, RED, 0.16);
+        this._strokePolyline(
+          ctx,
+          s.median,
+          this.box.size * this.opts.inkWidth * (this._isLatin ? 0.55 : 0.9),
+          RED,
+          0.16,
+        );
       }
       ctx.save();
       ctx.setLineDash([this.box.size * 0.014, this.box.size * 0.016]);
@@ -703,30 +749,32 @@ export class WritingSurface {
       const stroke = this.unit.strokes[anim.index];
       const p = Math.min(1, elapsed / anim.duration);
       const partial = partialPoints(stroke.median, p);
+      const mul = this._isLatin ? 0.4 : 1;
       const filled = this._fillHanzi(ctx, stroke, ACCENT, 0.16);
-      if (!filled) this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 1.05, ACCENT, 0.16);
-      this._strokePolyline(ctx, partial, size * this.opts.inkWidth * 0.95, ACCENT, 0.95);
+      if (!filled) this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 1.05 * mul, ACCENT, 0.16);
+      this._strokePolyline(ctx, partial, size * this.opts.inkWidth * 0.95 * mul, ACCENT, 0.95);
       this._drawBrush(ctx, partial);
       if (p >= 1) this._finishAnim();
       return;
     }
 
     if (anim.type === 'demo') {
+      const mul = this._isLatin ? 0.4 : 1;
       for (let i = 0; i < this.unit.strokes.length; i += 1) {
         const win = anim.windows[i];
         const stroke = this.unit.strokes[i];
         if (elapsed >= win.end) {
           const filled = this._fillHanzi(ctx, stroke, ACCENT, 0.2);
-          if (!filled) this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth, ACCENT, 0.2);
-          this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 0.9, ACCENT, 0.95);
+          if (!filled) this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * mul, ACCENT, 0.2);
+          this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 0.9 * mul, ACCENT, 0.95);
         } else if (elapsed >= win.start) {
           const p = (elapsed - win.start) / (win.end - win.start);
           const partial = partialPoints(stroke.median, p);
           const filled = this._fillHanzi(ctx, stroke, ACCENT, 0.05);
           if (!filled) {
-            this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 1.05, ACCENT, 0.08);
+            this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 1.05 * mul, ACCENT, 0.08);
           }
-          this._strokePolyline(ctx, partial, size * this.opts.inkWidth * 0.95, ACCENT, 0.95);
+          this._strokePolyline(ctx, partial, size * this.opts.inkWidth * 0.95 * mul, ACCENT, 0.95);
           this._drawBrush(ctx, partial);
           // number badge
           const [bx, by] = this._toPx(stroke.median[0]);

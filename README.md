@@ -179,7 +179,13 @@ public/
   icons/          Generated app icons
   sw.js           Offline shell + hanzi cache
 scripts/make-icons.mjs
+scripts/make-glyphs.mjs
+scripts/fetch-fonts.mjs
+scripts/hershey-sans.json
 test/scoring.test.js
+test/wadegiles.test.js
+test/units.test.js
+test/glyphs.test.js
 render.yaml
 ```
 
@@ -187,9 +193,9 @@ render.yaml
 
 ## Notes & limitations
 
-- **Fonts**: the UI uses **Nunito** and handwriting models use **Didact Gothic** — a clean, Arial-like face with the single-storey handwritten `a` children write. Both are self-hosted in `public/fonts/` (Latin + Latin-ext subsets) under the SIL Open Font License — see `public/fonts/OFL-*.txt`. `npm run fonts` re-downloads them.
+- **Fonts**: the UI uses **Nunito**; the English model text and ghost letters use **Didact Gothic**, a clean Arial-like face with the single-storey handwritten `a` children write. The tracing skeletons come from the public-domain **Hershey Sans 1-stroke** font. Nunito and Didact are self-hosted in `public/fonts/` (Latin + Latin-ext subsets) under the SIL Open Font License — see `public/fonts/OFL-*.txt`. `npm run fonts` re-downloads them.
 - **Chinese stroke data** comes from [`hanzi-writer-data`](https://github.com/chanind/hanzi-writer-data) via jsDelivr/unpkg. It is cached in `data/hanzi/` on the server and in the browser, so the app works offline after first use. Rare characters may not exist in the dataset — the app shows a friendly message instead of breaking.
-- **Latin letters** are hand-authored in `public/js/glyphs.js`, one stroke list per glyph, in a 0–1 square (cap height 0.14, x-height 0.52, baseline 0.80). Edit them to change the handwriting style.
+- **Latin stroke guides** are generated from the public-domain **Hershey Sans 1-stroke** font by `npm run glyphs` (`scripts/make-glyphs.mjs`). The letterforms are clean, Arial-like skeletons with the single-storey `a`/`g` and real teaching order (E is four strokes, T starts with the bar, and so on). The light ghost letter is drawn in Didact Gothic, so the model word, outline and direction arrows all agree.
 - **BM** uses the same Latin engine; only the word lists differ.
 - **Speech** uses the voices already on the iPad. If no Mandarin voice is installed, go to iPad **Settings → Accessibility → Spoken Content → Voices → Chinese** and download one.
 - **Wade-Giles** is generated from Hanyu Pinyin with the standard syllabary; rare characters or polyphonic characters use `pinyin-pro`'s default reading.
@@ -202,6 +208,8 @@ render.yaml
 ```bash
 npm start        # production server
 npm run dev      # auto-restart on file changes
-npm test         # scoring unit tests
+npm test         # scoring, Wade-Giles, tokenizer and glyph tests
 npm run icons    # regenerate the PNG/SVG icons
+npm run fonts    # re-download Nunito + Didact Gothic
+npm run glyphs   # regenerate the English stroke guides from Hershey
 ```

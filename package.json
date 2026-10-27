@@ -12,7 +12,8 @@
     "dev": "node --watch server/index.js",
     "icons": "node scripts/make-icons.mjs",
     "fonts": "node scripts/fetch-fonts.mjs",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js",
+    "glyphs": "node scripts/make-glyphs.mjs"
   },
   "dependencies": {
     "express": "^5.1.0",
