@@ -28,20 +28,25 @@ const oneOf = (v, list, def) => (list.includes(v) ? v : def);
 
 const bool = (v, def) => (typeof v === 'boolean' ? v : def);
 
+const int = (v, def, min, max) => {
+  const n = Math.round(Number(v));
+  return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : def;
+};
+
 const cleanText = (v, max) =>
   String(v ?? '')
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .trim()
     .slice(0, max);
 
-function cleanItem(raw) {
+function cleanItem(raw, maxText = 24) {
   if (!raw) return null;
-  const text = cleanText(typeof raw === 'string' ? raw : raw.text, 24);
+  const text = cleanText(typeof raw === 'string' ? raw : raw.text, maxText);
   if (!text) return null;
   const item = { text };
-  const meaning = cleanText(raw.meaning, 80);
+  const meaning = cleanText(raw.meaning, 120);
   if (meaning) item.meaning = meaning;
-  const pinyin = cleanText(raw.pinyin, 40);
+  const pinyin = cleanText(raw.pinyin, 60);
   if (pinyin) item.pinyin = pinyin;
   return item;
 }
@@ -49,11 +54,15 @@ function cleanItem(raw) {
 function cleanSet(raw, index) {
   if (!raw) return null;
   const name = cleanText(raw.name, 40) || `Set ${index + 1}`;
-  const lang = oneOf(raw.lang, ['zh', 'en', 'bm'], 'en');
+  const langRaw = oneOf(raw.lang, ['zh', 'en', 'bm'], 'en');
+  const kind = oneOf(raw.kind, ['latin', 'chinese', 'passage'], langRaw === 'zh' ? 'chinese' : 'latin');
+  const lang = kind === 'chinese' ? 'zh' : langRaw === 'zh' ? 'en' : langRaw;
+  const repeat = kind === 'passage' ? 1 : int(raw.repeat, 1, 1, 10);
+  const maxText = kind === 'passage' ? 900 : 24;
   const items = [];
   const seen = new Set();
   for (const entry of Array.isArray(raw.items) ? raw.items.slice(0, 300) : []) {
-    const item = cleanItem(entry);
+    const item = cleanItem(entry, maxText);
     if (!item || seen.has(item.text)) continue;
     seen.add(item.text);
     items.push(item);
@@ -62,7 +71,7 @@ function cleanSet(raw, index) {
   const id =
     cleanText(raw.id, 48).replace(/[^a-zA-Z0-9_-]/g, '') ||
     `set-${crypto.randomBytes(4).toString('hex')}`;
-  return { id, lang, name, enabled: raw.enabled !== false, items };
+  return { id, kind, lang, name, enabled: raw.enabled !== false, repeat, items };
 }
 
 export function sanitizeConfig(raw) {
@@ -86,6 +95,13 @@ export function sanitizeConfig(raw) {
     ? String(practice.inkColor)
     : base.practice.inkColor;
 
+  const allowedModes = Array.isArray(practice.allowedModes)
+    ? ['trace', 'copy', 'memory'].filter((m) => practice.allowedModes.includes(m))
+    : [...base.practice.allowedModes];
+  if (!allowedModes.length) allowedModes.push('trace');
+  let mode = oneOf(practice.mode, ['trace', 'copy', 'memory'], base.practice.mode);
+  if (!allowedModes.includes(mode)) mode = allowedModes[0];
+
   return {
     version: 1,
     app: {
@@ -93,7 +109,8 @@ export function sanitizeConfig(raw) {
       uiLang: oneOf(app.uiLang, ['en', 'zh', 'ms'], base.app.uiLang),
     },
     practice: {
-      mode: oneOf(practice.mode, ['trace', 'copy', 'memory'], base.practice.mode),
+      mode,
+      allowedModes,
       gridHanzi: oneOf(practice.gridHanzi, ['tian', 'mi', 'none'], base.practice.gridHanzi),
       gridLatin: oneOf(practice.gridLatin, ['lines', 'none'], base.practice.gridLatin),
       guideOpacity: clampNum(practice.guideOpacity, base.practice.guideOpacity, 0.04, 0.75),
@@ -101,10 +118,12 @@ export function sanitizeConfig(raw) {
       inkColor,
       boxScale: clampNum(practice.boxScale, base.practice.boxScale, 0.45, 1),
       showPinyin: bool(practice.showPinyin, base.practice.showPinyin),
+      showWadeGiles: bool(practice.showWadeGiles, base.practice.showWadeGiles),
       showMeaning: bool(practice.showMeaning, base.practice.showMeaning),
       showNumbers: bool(practice.showNumbers, base.practice.showNumbers),
       autoNext: bool(practice.autoNext, base.practice.autoNext),
       sound: bool(practice.sound, base.practice.sound),
+      speakOnComplete: bool(practice.speakOnComplete, base.practice.speakOnComplete),
       penOnly: bool(practice.penOnly, base.practice.penOnly),
     },
     scoring: {

@@ -9,6 +9,7 @@ export const DEFAULT_CONFIG = {
   },
   practice: {
     mode: 'trace', // trace | copy | memory
+    allowedModes: ['trace', 'copy', 'memory'],
     gridHanzi: 'tian', // tian | mi | none
     gridLatin: 'lines', // lines | none
     guideOpacity: 0.16,
@@ -16,10 +17,12 @@ export const DEFAULT_CONFIG = {
     inkColor: '#1f2937',
     boxScale: 1,
     showPinyin: true,
+    showWadeGiles: true,
     showMeaning: true,
     showNumbers: true,
     autoNext: true,
     sound: true,
+    speakOnComplete: true,
     penOnly: false,
   },
   scoring: {
@@ -30,9 +33,11 @@ export const DEFAULT_CONFIG = {
   sets: [
     {
       id: 'zh-numbers',
+      kind: 'chinese',
       lang: 'zh',
       name: '数字 Numbers',
       enabled: true,
+      repeat: 1,
       items: [
         { text: '一', meaning: 'one' },
         { text: '二', meaning: 'two' },
@@ -48,9 +53,11 @@ export const DEFAULT_CONFIG = {
     },
     {
       id: 'zh-basic',
+      kind: 'chinese',
       lang: 'zh',
       name: '基础字 Basic',
       enabled: true,
+      repeat: 1,
       items: [
         { text: '人', meaning: 'person' },
         { text: '口', meaning: 'mouth' },
@@ -71,9 +78,11 @@ export const DEFAULT_CONFIG = {
     },
     {
       id: 'zh-family',
+      kind: 'chinese',
       lang: 'zh',
       name: '我的家人 Family',
       enabled: true,
+      repeat: 1,
       items: [
         { text: '我', meaning: 'I / me' },
         { text: '爸', meaning: 'dad' },
@@ -87,9 +96,11 @@ export const DEFAULT_CONFIG = {
     },
     {
       id: 'zh-words',
+      kind: 'chinese',
       lang: 'zh',
       name: '常用词 Words',
       enabled: true,
+      repeat: 1,
       items: [
         { text: '你好', meaning: 'hello' },
         { text: '谢谢', meaning: 'thank you' },
@@ -102,17 +113,39 @@ export const DEFAULT_CONFIG = {
       ],
     },
     {
+      id: 'zh-phrases',
+      kind: 'chinese',
+      lang: 'zh',
+      name: '短语 Phrases',
+      enabled: true,
+      repeat: 2,
+      items: [
+        { text: '早上好', meaning: 'good morning' },
+        { text: '谢谢你', meaning: 'thank you' },
+        { text: '对不起', meaning: 'sorry' },
+        { text: '没关系', meaning: "it's okay" },
+        { text: '我爱你', meaning: 'I love you' },
+        { text: '我饿了', meaning: "I'm hungry" },
+        { text: '请坐', meaning: 'please sit' },
+        { text: '再见', meaning: 'goodbye' },
+      ],
+    },
+    {
       id: 'en-alphabet',
+      kind: 'latin',
       lang: 'en',
       name: 'Alphabet a–z',
       enabled: true,
+      repeat: 1,
       items: 'abcdefghijklmnopqrstuvwxyz'.split('').map((text) => ({ text })),
     },
     {
       id: 'en-first',
+      kind: 'latin',
       lang: 'en',
       name: 'First words',
       enabled: true,
+      repeat: 1,
       items: [
         { text: 'cat', meaning: '猫 · kucing' },
         { text: 'dog', meaning: '狗 · anjing' },
@@ -129,9 +162,11 @@ export const DEFAULT_CONFIG = {
     },
     {
       id: 'en-sight',
+      kind: 'latin',
       lang: 'en',
       name: 'Sight words',
       enabled: true,
+      repeat: 1,
       items: [
         { text: 'the', meaning: 'the' },
         { text: 'and', meaning: '和 · dan' },
@@ -146,10 +181,30 @@ export const DEFAULT_CONFIG = {
       ],
     },
     {
+      id: 'en-phrases',
+      kind: 'latin',
+      lang: 'en',
+      name: 'Phrases',
+      enabled: true,
+      repeat: 2,
+      items: [
+        { text: 'good morning', meaning: '早上好' },
+        { text: 'thank you', meaning: '谢谢' },
+        { text: 'how are you', meaning: '你好吗' },
+        { text: 'see you later', meaning: '待会儿见' },
+        { text: 'I love you', meaning: '我爱你' },
+        { text: 'good night', meaning: '晚安' },
+        { text: 'excuse me', meaning: '不好意思' },
+        { text: 'please sit down', meaning: '请坐' },
+      ],
+    },
+    {
       id: 'bm-suku',
+      kind: 'latin',
       lang: 'bm',
       name: 'Suku kata',
       enabled: true,
+      repeat: 1,
       items: [
         { text: 'ba' },
         { text: 'bi' },
@@ -173,9 +228,11 @@ export const DEFAULT_CONFIG = {
     },
     {
       id: 'bm-words',
+      kind: 'latin',
       lang: 'bm',
       name: 'Perkataan',
       enabled: true,
+      repeat: 1,
       items: [
         { text: 'ibu', meaning: 'mother' },
         { text: 'ayah', meaning: 'father' },
@@ -189,6 +246,24 @@ export const DEFAULT_CONFIG = {
         { text: 'rumah', meaning: 'house' },
         { text: 'sekolah', meaning: 'school' },
         { text: 'terima kasih', meaning: 'thank you' },
+      ],
+    },
+    {
+      id: 'mixed-passages',
+      kind: 'passage',
+      lang: 'en',
+      name: 'My day · 我的一天',
+      enabled: true,
+      repeat: 1,
+      items: [
+        {
+          text: 'Good morning! 早上好！I brush my teeth. 我刷牙。I eat breakfast. 我吃早餐。Then I go to school. 然后我去学校。',
+          meaning: 'A short bilingual passage',
+        },
+        {
+          text: 'My name is Jun Kai. 我叫俊凯。I am six years old. 我六岁。I like to draw cats. 我喜欢画猫。',
+          meaning: 'All about me',
+        },
       ],
     },
   ],

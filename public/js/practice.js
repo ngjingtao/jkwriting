@@ -1,4 +1,5 @@
-import { buildUnits } from './units.js';
+import { buildUnits, parsePassage } from './units.js';
+import { fetchHanzi } from './api.js';
 import { WritingSurface } from './surface.js';
 import {
   compareStroke,
@@ -12,33 +13,49 @@ import {
 import { h, icon, toast, starsEl, segmented, burstConfetti, openSheet, switchRow, clear } from './ui.js';
 import { makeT } from './i18n.js';
 import { sfx, setSound, unlockAudio } from './sound.js';
+import { speak, primeSpeech, setSpeechEnabled, voiceLang } from './speech.js';
 import { addEntry } from './history.js';
 import { setOverride, clearOverrides } from './settings.js';
 
 const MODES = ['trace', 'copy', 'memory'];
 
 export class Practice {
-  constructor({ config, settings, item, set, lang, setName, onExit, onNext }) {
+  constructor({ config, settings, item, set, lang, kind, setName, onExit, onNext }) {
     this.config = config;
     this.settings = { ...settings };
     this.item = item;
     this.set = set;
     this.lang = lang;
+    this.kind = kind || set?.kind || (lang === 'zh' ? 'chinese' : 'latin');
     this.setName = setName;
     this.onExit = onExit;
     this.onNext = onNext;
     this.t = makeT(this.settings.uiLang);
     this.tolerance = TOLERANCE[this.settings.tolerance] || 1;
 
+    this.rounds = this.kind === 'passage' ? 1 : Math.max(1, Number(set?.repeat) || 1);
+    this.round = 1;
+    this.allowedModes =
+      Array.isArray(this.settings.allowedModes) && this.settings.allowedModes.length
+        ? MODES.filter((m) => this.settings.allowedModes.includes(m))
+        : [...MODES];
+    if (!this.allowedModes.length) this.allowedModes = [...MODES];
+    this.mode = this.allowedModes.includes(this.settings.mode)
+      ? this.settings.mode
+      : this.allowedModes[0];
+    this.tokens = [];
+    this.tokenIndex = 0;
+    this.completed = [];
     this.units = [];
     this.index = 0;
     this.results = [];
     this.header = [];
     this.state = null;
-    this.pending = null;
-    this.mode = this.settings.mode;
     this._timers = [];
     this._destroyed = false;
+    this._recorded = false;
+    this._tokenDone = -1;
+    this._pendingAdvance = 0;
   }
 
   async mount() {
@@ -60,6 +77,7 @@ export class Practice {
     };
     this.surface.onStrokeEnd = (rec) => this._strokeEnd(rec);
     setSound(this.settings.sound);
+    setSpeechEnabled(this.settings.speakOnComplete !== false);
 
     try {
       await this._load();
@@ -93,12 +111,20 @@ export class Practice {
     const t = this.t;
     this.wordEl = h('div', { class: 'p-word' });
     this.pinyinEl = h('div', { class: 'p-pinyin' });
+    this.wgEl = h('div', { class: 'p-wg', hidden: true });
     this.progressEl = h('div', { class: 'p-progress' }, '1 / 1');
+    this.roundEl = h('div', { class: 'p-round', hidden: true });
 
     const backBtn = h(
       'button',
       { class: 'icon-btn', 'aria-label': t('practice.back'), onclick: () => this.onExit?.() },
       icon('back'),
+    );
+
+    const speakBtn = h(
+      'button',
+      { class: 'icon-btn', 'aria-label': t('practice.speak'), onclick: () => this._speakCurrent() },
+      icon('volume'),
     );
 
     const settingsBtn = h(
@@ -111,17 +137,19 @@ export class Practice {
       'header',
       { class: 'p-head' },
       backBtn,
-      h('div', { class: 'p-title' }, this.wordEl, this.pinyinEl),
-      this.progressEl,
+      h('div', { class: 'p-title' }, this.wordEl, this.pinyinEl, this.wgEl),
+      h('div', { class: 'p-meta' }, this.progressEl, this.roundEl),
+      speakBtn,
       settingsBtn,
     );
 
     this.modeRow = h('div', { class: 'mode-pills', role: 'group' });
-    for (const m of MODES) {
+    for (const m of this.allowedModes) {
       this.modeRow.append(
         h(
           'button',
           {
+            dataset: { mode: m },
             'aria-pressed': String(m === this.mode),
             onclick: () => this._setMode(m),
           },
@@ -129,7 +157,10 @@ export class Practice {
         ),
       );
     }
+    this.modeRowWrap = h('div', { class: 'mode-row' }, this.modeRow);
+    if (this.allowedModes.length < 2) this.modeRowWrap.hidden = true;
 
+    this.contextEl = h('div', { class: 'context-bar', hidden: true });
     this.canvas = h('canvas');
     this.badge = h('div', { class: 'unit-badge' });
     this.stage = h('div', { class: 'stage' }, this.canvas, this.badge);
@@ -138,7 +169,8 @@ export class Practice {
     const body = h(
       'div',
       { class: 'p-body' },
-      h('div', { class: 'mode-row' }, this.modeRow),
+      this.contextEl,
+      this.modeRowWrap,
       this.stage,
       this.hintEl,
     );
@@ -160,7 +192,14 @@ export class Practice {
     );
 
     this.root.append(head, body, toolbar);
-    this.root.addEventListener('pointerdown', unlockAudio, { once: true });
+    this.root.addEventListener(
+      'pointerdown',
+      () => {
+        unlockAudio();
+        primeSpeech();
+      },
+      { once: true },
+    );
   }
 
   _tool(iconName, label, onClick, extra = '') {
@@ -173,12 +212,12 @@ export class Practice {
   }
 
   _setMode(mode) {
-    if (mode === this.mode) return;
+    if (mode === this.mode || !this.allowedModes.includes(mode)) return;
     this.mode = mode;
     setOverride('mode', mode);
     this.settings.mode = mode;
-    for (const [i, m] of MODES.entries()) {
-      this.modeRow.children[i]?.setAttribute('aria-pressed', String(m === mode));
+    for (const button of this.modeRow.children) {
+      button.setAttribute('aria-pressed', String(button.dataset.mode === mode));
     }
     if (this.units.length) this._startUnit();
   }
@@ -187,15 +226,29 @@ export class Practice {
 
   async _load() {
     this._loading(true);
-    const built = await buildUnits(this.item, this.lang);
-    this.units = built.units;
-    this.pinyin = built.pinyin;
-    this.meaning = built.meaning;
-    this.header = built.header;
+    if (this.kind === 'passage') {
+      this.tokens = parsePassage(this.item.text, this.lang === 'zh' ? 'en' : this.lang);
+    } else {
+      this.tokens = [
+        {
+          text: this.item.text,
+          lang: this.lang,
+          sentence: this.item.text,
+          meaning: this.item.meaning || '',
+        },
+      ];
+    }
+    if (!this.tokens.length) throw new Error('empty');
+    this._prefetchFrom(0);
+    await this._startToken(0);
     this._loading(false);
-    this.index = 0;
-    this.results = [];
-    this._startUnit();
+  }
+
+  _prefetchFrom(index) {
+    for (let i = index; i < Math.min(this.tokens.length, index + 3); i += 1) {
+      const token = this.tokens[i];
+      if (token.lang === 'zh') fetchHanzi(token.text).catch(() => {});
+    }
   }
 
   _loading(on) {
@@ -214,14 +267,46 @@ export class Practice {
     }
   }
 
+  async _startToken(index) {
+    if (this._destroyed) return;
+    this.tokenIndex = index;
+    this._tokenDone = -1;
+    this._pendingAdvance = 0;
+    const token = this.tokens[index];
+    this._prefetchFrom(index);
+
+    let built;
+    try {
+      built = await buildUnits(
+        { text: token.text, meaning: token.meaning, pinyin: token.pinyin },
+        token.lang,
+      );
+    } catch (err) {
+      this._showError(err);
+      return;
+    }
+    if (this._destroyed) return;
+
+    this.units = built.units;
+    this.header = built.header;
+    this.pinyin = built.pinyin;
+    this.wg = built.wg;
+    this.meaning = built.meaning || token.meaning || '';
+    this.index = 0;
+    this.results = [];
+    this._renderContext(token);
+    this._startUnit();
+  }
+
   _startUnit() {
     const unit = this.units[this.index];
     if (!unit) return;
     this.state = { next: 0, accepted: [], fails: 0, done: false };
-    this.pending = null;
 
     this._renderHeader();
     this.progressEl.textContent = `${this.index + 1} / ${this.units.length}`;
+    this.roundEl.hidden = this.rounds <= 1;
+    this.roundEl.textContent = this.t('practice.round', { a: this.round, b: this.rounds });
     this.surface.configure({
       guideOpacity: this.settings.guideOpacity,
       inkWidth: this.settings.inkWidth,
@@ -250,6 +335,36 @@ export class Practice {
     if (this.settings.showPinyin && this.pinyin) bits.push(this.pinyin);
     if (this.settings.showMeaning && this.meaning) bits.push(this.meaning);
     this.pinyinEl.textContent = bits.join(' · ');
+    this.pinyinEl.hidden = bits.length === 0;
+
+    if (this.settings.showWadeGiles && this.wg) {
+      this.wgEl.hidden = false;
+      this.wgEl.textContent = `WG ${this.wg}`;
+    } else {
+      this.wgEl.hidden = true;
+      this.wgEl.textContent = '';
+    }
+  }
+
+  _renderContext(token) {
+    if (this.kind !== 'passage') {
+      this.contextEl.hidden = true;
+      return;
+    }
+    this.contextEl.hidden = false;
+    clear(this.contextEl);
+    const sentence = token.sentence || token.text;
+    const at = sentence.indexOf(token.text);
+    if (at >= 0) {
+      this.contextEl.append(document.createTextNode(sentence.slice(0, at)));
+      this.contextEl.append(h('mark', {}, token.text));
+      this.contextEl.append(document.createTextNode(sentence.slice(at + token.text.length)));
+    } else {
+      this.contextEl.append(document.createTextNode(sentence));
+    }
+    this.contextEl.append(
+      h('span', { class: 'ctx-count' }, `${this.tokenIndex + 1} / ${this.tokens.length}`),
+    );
   }
 
   /* -------------------------------- strokes ------------------------------- */
@@ -330,19 +445,7 @@ export class Practice {
     this.surface.setHint(-1);
     this.surface.applyResult(result);
     sfx.done();
-
-    const last = this.index === this.units.length - 1;
-    if (last) {
-      this._later(() => this._showWordResult(), 650);
-      return;
-    }
-
-    this._flashBadge(result);
-    if (this.settings.autoNext) {
-      this._later(() => this._advance(), 1550);
-    } else {
-      this._updateButtons();
-    }
+    this._advance();
   }
 
   _checkFree() {
@@ -351,27 +454,84 @@ export class Practice {
       return;
     }
     const unit = this.units[this.index];
-    const refs = unit.strokes.map((s) => s.median);
-    const result = scoreUnit(refs, this.surface.getInkStrokes(), this.tolerance);
+    const result = scoreUnit(
+      unit.strokes.map((s) => s.median),
+      this.surface.getInkStrokes(),
+      this.tolerance,
+    );
     this.surface.applyResult(result);
     this.state.done = true;
+    this.results[this.index] = result;
     sfx.done();
-    if (this.index === this.units.length - 1) {
-      this.results[this.index] = result;
-      this._later(() => this._showWordResult(), 500);
+    this._flashBadge(result);
+    if (this.index < this.units.length - 1) {
+      this._pendingAdvance = this._later(() => this._advance(), 1250);
     } else {
-      this.pending = result;
-      this._later(() => this._showUnitResult(result), 400);
+      this._pendingAdvance = this._later(() => this._finishToken(), 600);
     }
+    this._updateButtons();
   }
 
   _advance() {
-    if (this.index >= this.units.length - 1) {
-      this._showWordResult();
+    if (this._pendingAdvance) {
+      clearTimeout(this._pendingAdvance);
+      this._pendingAdvance = 0;
+    }
+    if (this.index < this.units.length - 1) {
+      this.index += 1;
+      this._startUnit();
       return;
     }
-    this.index += 1;
-    this._startUnit();
+    this._finishToken();
+  }
+
+  _nextToken() {
+    if (this.tokenIndex >= this.tokens.length - 1) return;
+    this._startToken(this.tokenIndex + 1);
+  }
+
+  _finishToken() {
+    if (this._tokenDone === this.tokenIndex) return;
+    this._tokenDone = this.tokenIndex;
+    const token = this.tokens[this.tokenIndex];
+    const results = this.results.filter(Boolean);
+    const pct = results.length
+      ? Math.round(results.reduce((sum, r) => sum + r.pct, 0) / results.length)
+      : 0;
+    const summary = {
+      text: token.text,
+      lang: token.lang,
+      pinyin: this.pinyin,
+      wg: this.wg,
+      meaning: this.meaning,
+      units: this.units.map((u) => u.char),
+      results: results.slice(),
+      pct,
+      stars: starsFor(pct),
+    };
+    this.completed.push(summary);
+    this.surface.stopAnimation();
+    if (this.settings.speakOnComplete !== false) {
+      speak(summary.text, voiceLang(summary.lang));
+    }
+
+    if (this.tokenIndex < this.tokens.length - 1) {
+      this.state.done = true;
+      this._flashBadge(summary);
+      this._updateButtons();
+      if (this.settings.autoNext) {
+        this._pendingAdvance = this._later(() => this._nextToken(), 1500);
+      }
+      return;
+    }
+
+    this._later(() => this._showWordResult(), 550);
+  }
+
+  _speakCurrent() {
+    const token = this.tokens[this.tokenIndex];
+    if (!token) return;
+    speak(token.text, voiceLang(token.lang));
   }
 
   /* ------------------------------- toolbar -------------------------------- */
@@ -408,14 +568,19 @@ export class Practice {
     if (this.state) {
       this.state = { next: 0, accepted: [], fails: 0, done: false };
     }
-    this.pending = null;
     if (this.mode === 'trace') this.surface.setHint(0);
     this._updateButtons();
   }
 
   _primary() {
+    if (this._pendingAdvance) {
+      clearTimeout(this._pendingAdvance);
+      this._pendingAdvance = 0;
+    }
     if (this.state?.done) {
-      this._advance();
+      if (this.index < this.units.length - 1) this._advance();
+      else if (this.tokenIndex < this.tokens.length - 1) this._nextToken();
+      else this._finishToken();
       return;
     }
     if (this.mode === 'trace') {
@@ -431,12 +596,13 @@ export class Practice {
 
   _updateButtons() {
     const ink = this.surface?.hasInk();
+    const done = this.state?.done;
+    const canNext = done && (this.index < this.units.length - 1 || this.tokenIndex < this.tokens.length - 1);
     this.btnUndo.disabled = !ink;
     this.btnClear.disabled = !ink;
-    const canAdvance = this.state?.done && this.index < this.units.length - 1;
-    this.btnPrimary.disabled = !ink && !this.state?.done;
-    this.btnPrimary.lastChild.textContent = canAdvance ? this.t('practice.next') : this.t('practice.check');
-    this.btnPrimary.firstChild.replaceWith(icon(canAdvance ? 'chevron' : 'check'));
+    this.btnPrimary.disabled = canNext ? false : !ink || done;
+    this.btnPrimary.lastChild.textContent = canNext ? this.t('practice.next') : this.t('practice.check');
+    this.btnPrimary.firstChild.replaceWith(icon(canNext ? 'chevron' : 'check'));
   }
 
   /* -------------------------------- results ------------------------------- */
@@ -449,11 +615,11 @@ export class Practice {
       h('div', { class: 'ub-label' }, this.t('result.unit', { pct: result.pct })),
     );
     this.badge.classList.add('show');
-    this._later(() => this.badge.classList.remove('show'), 1250);
+    this._later(() => this.badge.classList.remove('show'), 1300);
   }
 
   _wordStats() {
-    const results = this.results.filter(Boolean);
+    const results = this.completed;
     const avg = results.length
       ? Math.round(results.reduce((sum, r) => sum + r.pct, 0) / results.length)
       : 0;
@@ -465,95 +631,120 @@ export class Practice {
     };
   }
 
-  _showUnitResult(result) {
-    const t = this.t;
-    const tips = this.settings.showTips ? this._tipsFor(result) : [];
-    const card = this._resultCard({
-      pct: result.pct,
-      stars: result.stars,
-      title: this._feedback(result.pct),
-      word: this.units[this.index].char,
-      meaning: '',
-      tips,
-      actions: [
-        {
-          label: t('result.again'),
-          kind: 'ghost',
-          onClick: (close) => {
-            close();
-            this.pending = null;
-            this.surface.clearInk();
-            this.state = { next: 0, accepted: [], fails: 0, done: false };
-            if (this.mode === 'trace') this.surface.setHint(0);
-            this._updateButtons();
-          },
-        },
-        {
-          label: t('practice.next'),
-          kind: 'primary',
-          onClick: (close) => {
-            close();
-            if (this.pending) this.results[this.index] = this.pending;
-            this.pending = null;
-            this._advance();
-          },
-        },
-      ],
+  _recordHistory() {
+    if (this._recorded) return;
+    this._recorded = true;
+    const stats = this._wordStats();
+    addEntry({
+      text: this.item.text,
+      lang: this.lang,
+      setName: this.setName,
+      kind: this.kind,
+      pct: stats.avg,
+      stars: stats.stars,
     });
-    document.body.append(card.wrap);
-    this._resultWrap = card.wrap;
-    this._resultCleanup = card.close;
   }
 
   _showWordResult() {
-    const t = this.t;
     if (this._resultCleanup) return;
+    const t = this.t;
     const stats = this._wordStats();
+    const isPassage = this.kind === 'passage';
+    const lastRound = !isPassage && this.round >= this.rounds;
+    const final = isPassage || lastRound;
+    const first = this.completed[0];
     const tips = this.settings.showTips ? this._collectTips() : [];
-    const unitChips =
-      this.units.length > 1
-        ? this.units.map((u, i) => {
-            const r = this.results[i];
-            return h(
-              'div',
-              { class: 'rc-unit' },
-              h('span', { class: 'u' }, u.char),
-              h('span', { class: 's' }, '★'.repeat(r?.stars || 0)),
-            );
-          })
-        : null;
+
+    const title = isPassage
+      ? t('result.passageTitle')
+      : final
+        ? stats.avg >= 90
+          ? t('result.perfect')
+          : t('result.title')
+        : t('result.roundDone', { a: this.round });
+
+    const roman =
+      first && first.wg
+        ? `${first.pinyin || ''}${first.pinyin ? '  ·  ' : ''}WG ${first.wg}`
+        : first?.pinyin || '';
+
+    let chips = null;
+    if (!isPassage && first) {
+      chips = first.units.map((u, i) => {
+        const r = first.results[i];
+        return h(
+          'div',
+          { class: 'rc-unit' },
+          h('span', { class: 'u' }, u),
+          h('span', { class: 's' }, '★'.repeat(r?.stars || 0)),
+        );
+      });
+    } else if (isPassage) {
+      chips = this.completed.slice(0, 14).map((token) =>
+        h(
+          'div',
+          { class: 'rc-unit' },
+          h('span', { class: 'u' }, token.text),
+          h('span', { class: 's' }, '★'.repeat(token.stars)),
+        ),
+      );
+    }
+
+    if (final) this._recordHistory();
 
     const actions = [];
-    if (this.onNext && this.set) {
+    if (!final) {
       actions.push({
-        label: t('result.next'),
+        label: t('result.againRound', { a: this.round + 1, b: this.rounds }),
         kind: 'primary',
         onClick: (close) => {
           close();
-          this.onNext();
+          this._restartRound();
+        },
+      });
+      if (this.onNext) {
+        actions.push({
+          label: t('result.next'),
+          kind: 'ghost',
+          onClick: (close) => {
+            close();
+            this._recordHistory();
+            this.onNext();
+          },
+        });
+      }
+    } else {
+      if (this.onNext) {
+        actions.push({
+          label: t('result.next'),
+          kind: 'primary',
+          onClick: (close) => {
+            close();
+            this.onNext();
+          },
+        });
+      }
+      actions.push({
+        label: t('result.again'),
+        kind: this.onNext ? 'ghost' : 'primary',
+        onClick: (close) => {
+          close();
+          this._restartAll();
         },
       });
     }
-    actions.push({
-      label: t('result.again'),
-      kind: this.onNext && this.set ? 'ghost' : 'primary',
-      onClick: (close) => {
-        close();
-        this.results = [];
-        this.index = 0;
-        this._startUnit();
-      },
-    });
 
     const card = this._resultCard({
       pct: stats.avg,
       stars: stats.stars,
-      title: stats.avg >= 90 ? t('result.perfect') : t('result.title'),
+      title,
       word: this.item.text,
-      meaning: this.meaning || '',
+      roman,
+      meaning: this.meaning || this.item.meaning || '',
       tips,
-      unitChips,
+      unitChips: chips,
       actions,
+      wordClass: isPassage ? 'long' : '',
       onHome: (close) => {
         close();
         this.onExit?.();
@@ -563,48 +754,50 @@ export class Practice {
     this._resultWrap = card.wrap;
     this._resultCleanup = card.close;
 
-    addEntry({
-      text: this.item.text,
-      lang: this.lang,
-      setName: this.setName,
-      pct: stats.avg,
-      stars: stats.stars,
-    });
-
-    if (stats.avg >= 76) {
+    if (final && stats.avg >= 76) {
       sfx.done();
       burstConfetti();
     }
   }
 
-  _feedback(pct) {
-    const t = this.t;
-    if (pct >= 90) return t('fb.perfect');
-    if (pct >= 76) return t('fb.great');
-    if (pct >= 60) return t('fb.good');
-    if (pct >= 40) return t('fb.ok');
-    return t('fb.try');
-  }
-
-  _tipsFor(result) {
-    return unitTips(result, 2).map((tip) => this.t(`tip.${tip.issue}`, { n: tip.stroke }));
-  }
-
   _collectTips() {
     const out = [];
-    for (const [i, result] of this.results.entries()) {
-      if (!result) continue;
-      const prefix = this.units.length > 1 ? `${this.units[i]?.char} · ` : '';
-      for (const tip of unitTips(result, 1)) {
-        const text = prefix + this.t(`tip.${tip.issue}`, { n: tip.stroke });
-        if (!out.includes(text)) out.push(text);
+    for (const token of this.completed) {
+      for (const [i, result] of token.results.entries()) {
+        if (!result) continue;
+        const prefix =
+          token.units.length > 1
+            ? `${token.units[i]} · `
+            : this.kind === 'passage'
+              ? `${token.text} · `
+              : '';
+        for (const tip of unitTips(result, 1)) {
+          const text = prefix + this.t(`tip.${tip.issue}`, { n: tip.stroke });
+          if (!out.includes(text)) out.push(text);
+        }
       }
       if (out.length >= 2) break;
     }
     return out.slice(0, 2);
   }
 
-  _resultCard({ pct, stars, title, word, meaning, tips, unitChips, actions, onHome }) {
+  _restartRound() {
+    this.round += 1;
+    this.completed = [];
+    this.results = [];
+    this._recorded = false;
+    this._startToken(0);
+  }
+
+  _restartAll() {
+    this.round = 1;
+    this.completed = [];
+    this.results = [];
+    this._recorded = false;
+    this._startToken(0);
+  }
+
+  _resultCard({ pct, stars, title, word, roman, meaning, tips, unitChips, actions, wordClass, onHome }) {
     const t = this.t;
     const ringColor = pct >= 76 ? '#16a34a' : pct >= 55 ? '#f59e0b' : '#ef4444';
     const wrap = h('div', { class: 'result-wrap' });
@@ -618,7 +811,8 @@ export class Practice {
       ),
       starsEl(stars, 5, 'lg'),
       h('h2', {}, title),
-      h('div', { class: 'rc-word' }, word),
+      h('div', { class: `rc-word ${wordClass || ''}`.trim() }, word),
+      roman ? h('div', { class: 'rc-roman' }, roman) : null,
       meaning ? h('div', { class: 'rc-meaning' }, meaning) : null,
       unitChips ? h('div', { class: 'rc-units' }, ...unitChips) : null,
       tips?.length
@@ -627,16 +821,16 @@ export class Practice {
       h(
         'div',
         { class: 'rc-actions' },
-        ...actions.map((a) =>
+        ...actions.map((action) =>
           h(
             'button',
             {
-              class: `btn ${a.kind}`,
+              class: `btn ${action.kind}`,
               onclick: () => {
-                a.onClick(close);
+                action.onClick(close);
               },
             },
-            a.label,
+            action.label,
           ),
         ),
       ),
@@ -703,6 +897,11 @@ export class Practice {
         setOverride('sound', on);
         setSound(on);
       }),
+      switchRow(t('settings.speak'), t('settings.speakDesc'), s.speakOnComplete !== false, (on) => {
+        s.speakOnComplete = on;
+        setOverride('speakOnComplete', on);
+        setSpeechEnabled(on);
+      }),
       switchRow(t('settings.penOnly'), t('settings.penOnlyDesc'), s.penOnly, (on) => {
         s.penOnly = on;
         setOverride('penOnly', on);
@@ -718,7 +917,7 @@ export class Practice {
         { class: 'row' },
         h('div', { class: 'label' }, t('practice.modeLabel')),
         segmented(
-          MODES.map((m) => ({ id: m, label: t(`practice.${m}`) })),
+          this.allowedModes.map((m) => ({ id: m, label: t(`practice.${m}`) })),
           this.mode,
           (m) => this._setMode(m),
         ),

@@ -5,9 +5,16 @@ A handwriting practice web app for the iPad. The child writes with an Apple Penc
 Built for a bilingual household: **Chinese (with real stroke order)** plus **English / Bahasa Melayu** (Latin letters). Everything is editable from a parent page — word lists, character size, guide strength and how strict the scoring is.
 
 - **iPad first**: full screen, Apple Pencil pressure, palm rejection, works offline after the first visit, installs to the home screen.
+- **Three content types**, all controlled from the parent page:
+  - **A · Latin words / phrases** — write them letter by letter.
+  - **B · Chinese words / phrases** — write them character by character with real stroke order.
+  - **C · Mixed passages** — Chinese and Latin in one text, practised word by word with the sentence kept in view.
+- **Repeat count** for A and B (write each word 2×, 3× … up to 10×).
+- **Read aloud**: the word is spoken automatically when it is finished, with a speaker button to hear it again.
+- **Hanyu Pinyin + Wade-Giles (威氏拼音)** shown together for every Chinese character.
 - **Stroke-by-stroke teaching**: numbered start dots, direction arrows, demo animation, hints after a wrong stroke.
 - **Real scoring**: compares each stroke's shape, position, length and direction — starting from the wrong end is penalised.
-- **Three modes**: Trace (描红), Copy (临摹), Memory (默写).
+- **Choose which modes are allowed** in the parent page: Trace (描红), Copy (临摹), Memory (默写).
 - **Parent admin**: PIN-protected page for word lists, size, grid, ink and scoring.
 - **Tiny stack**: Node + Express + vanilla JS. No build step, no framework.
 
@@ -96,17 +103,30 @@ Render's free plan has an **ephemeral disk**: `data/store.json` is lost when the
 
 | Tab | What it does |
 | --- | --- |
-| **Word lists** | Add / rename / duplicate / delete lists. One word per line; add a meaning after `\|`: `cat \| 猫 · kucing`. |
-| **Practice** | App title and UI language, default mode, grids, **practice box size**, guide visibility, ink thickness/colour, pinyin/meaning/stroke numbers, sound, pencil-only. |
+| **Word lists** | Add / rename / duplicate / delete lists. Choose **A Latin**, **B Chinese** or **C Mixed passage**, set the **repeat count**, and type one item per line. |
+| **Practice** | App title and UI language, **which modes are allowed** (checkboxes), grids, **practice box size**, guide visibility, ink thickness/colour, pinyin / Wade-Giles / meaning / stroke numbers, sound, **read aloud**, pencil-only. |
 | **Scoring** | Tolerance (gentle / normal / strict), pass mark per stroke, coaching tips. |
 | **Backup** | Export / import JSON, reset to defaults, storage + gist status. |
 
 ### Word list rules
 
-- **Chinese lists** practise **one character at a time**; multi-character words are split automatically (`你好` → 你, then 好). Pinyin is added automatically from `pinyin-pro`.
-- **English / BM lists** practise **one letter at a time**; spaces and punctuation are skipped (`terima kasih` → 11 letters).
+- **A · Latin words / phrases** practise **one letter at a time**; spaces and punctuation are skipped (`good morning` → g,o,o,d,m,o,r,n,i,n,g). Repeat runs the whole word again.
+- **B · Chinese words / phrases** practise **one character at a time** (`早上好` → 早, 上, 好). Pinyin, Wade-Giles and stroke data are added automatically.
+- **C · Mixed passages** are split into Chinese characters and Latin words; the current sentence stays visible above the practice box. Each word/character is scored and read aloud as it is finished, then the whole passage gets a summary. Repeat does not apply to passages.
+- **Meaning** is optional: `cat | 猫 · kucing`.
 - Letters and digits are supported: `a–z`, `A–Z`, `0–9`.
-- Duplicate words in a list are dropped on save.
+- Duplicate lines in a list are dropped on save.
+
+### Reading aloud
+
+- Uses the iPad's built-in `speechSynthesis` voices: Mandarin for Chinese, English or Malay for Latin text.
+- If the iPad has no Malay voice, the app falls back to Indonesian, then English.
+- The first speech happens after a tap, which satisfies iOS's audio rules. There is a speaker button in the practice header to repeat it.
+- Turn it off globally in **Practice → Read aloud**, or per device in the settings sheet.
+
+### Wade-Giles
+
+The parent page shows **Hanyu Pinyin** and **Wade-Giles (威氏拼音)** together, e.g. `zǎo shàng hǎo` / `WG tsao³ shang⁴ hao³`. Tones are superscript numbers 1–4; neutral tone has no number. Conversions use the standard Wade-Giles syllabary (`ch`, `ch'`, `hs`, `tzŭ`, `ssŭ`, `jih`, `erh`, …) and can be toggled in the admin page.
 
 ---
 
@@ -135,18 +155,20 @@ server/
   index.js        Express app, API, admin auth
   store.js        Config load/save, validation, optional gist sync
   hanzi.js        Stroke data fetch + disk/memory cache (hanzi-writer-data)
+  wadegiles.js    Hanyu Pinyin → Wade-Giles conversion (tested)
   auth.js         PIN + signed cookie
   defaults.js     Starter word lists and default settings
 public/
   index.html      Practice app
   admin.html      Parent page
   js/
-    app.js        Home screen, navigation, settings
-    practice.js   Lesson flow, guided strokes, results
+    app.js        Home screen, tabs (Chinese / English / BM / Passages)
+    practice.js   Tokens, rounds, guided strokes, speech, results
     surface.js    Canvas: paper, grids, ghost strokes, arrows, ink, demo
     scoring.js    Geometry + scoring (tested)
     glyphs.js     Hand-authored Latin alphabet + digits (stroke order)
-    units.js      Word → practice units (Chinese / Latin)
+    units.js      Words / passages → practice tokens and units
+    speech.js     Read-aloud with per-script voices
     i18n.js       English / 中文 / Bahasa Melayu UI strings
     ui.js         DOM helpers, icons, sheet, stars, confetti
     api.js        Fetch helpers
@@ -168,6 +190,8 @@ render.yaml
 - **Chinese stroke data** comes from [`hanzi-writer-data`](https://github.com/chanind/hanzi-writer-data) via jsDelivr/unpkg. It is cached in `data/hanzi/` on the server and in the browser, so the app works offline after first use. Rare characters may not exist in the dataset — the app shows a friendly message instead of breaking.
 - **Latin letters** are hand-authored in `public/js/glyphs.js`, one stroke list per glyph, in a 0–1 square (cap height 0.14, x-height 0.52, baseline 0.80). Edit them to change the handwriting style.
 - **BM** uses the same Latin engine; only the word lists differ.
+- **Speech** uses the voices already on the iPad. If no Mandarin voice is installed, go to iPad **Settings → Accessibility → Spoken Content → Voices → Chinese** and download one.
+- **Wade-Giles** is generated from Hanyu Pinyin with the standard syllabary; rare characters or polyphonic characters use `pinyin-pro`'s default reading.
 - Scores are intentionally a bit generous for young children. Use **Scoring → Strict** when they are ready.
 - The admin cookie is `HttpOnly`, signed, and lasts 30 days. Set a long, private `ADMIN_PIN`.
 - No personal data leaves the device: the score history is in `localStorage`; only word lists/settings live on the server.

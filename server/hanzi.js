@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { pinyin } from 'pinyin-pro';
 import { DATA_DIR } from './store.js';
+import { toWadeGiles } from './wadegiles.js';
 
 const VERSION = '2.0.1';
 const CDNS = [
@@ -38,7 +39,7 @@ async function writeDisk(char, data) {
 }
 
 /**
- * Returns { char, pinyin, strokes, medians, radStrokes } or null when the
+ * Returns { char, pinyin, wg, strokes, medians, radStrokes } or null when the
  * character has no stroke data available.
  */
 export async function getHanzi(rawChar) {
@@ -48,6 +49,7 @@ export async function getHanzi(rawChar) {
 
   const disk = await readDisk(char);
   if (disk) {
+    if (!disk.wg && disk.pinyin) disk.wg = toWadeGiles(disk.pinyin);
     memory.set(char, disk);
     return disk;
   }
@@ -58,9 +60,11 @@ export async function getHanzi(rawChar) {
       if (!res.ok) continue;
       const json = await res.json();
       if (!Array.isArray(json.strokes) || !Array.isArray(json.medians)) continue;
+      const py = pinyinFor(char);
       const data = {
         char,
-        pinyin: pinyinFor(char),
+        pinyin: py,
+        wg: toWadeGiles(py),
         strokes: json.strokes,
         medians: json.medians,
         radStrokes: json.radStrokes || [],

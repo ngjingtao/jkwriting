@@ -141,6 +141,16 @@
   color: #c2410c;
 }
 
+.lang-badge.chinese {
+  background: #eef0ff;
+  color: #4f46e5;
+}
+
+.lang-badge.passage {
+  background: #fef3c7;
+  color: #b45309;
+}
+
 .field {
   margin-bottom: 16px;
 }
@@ -187,8 +197,12 @@
   font-size: 13.5px;
   line-height: 1.7;
   resize: vertical;
-  white-space: pre;
+  white-space: pre-wrap;
   overflow: auto;
+}
+
+.textarea.tall {
+  min-height: 430px;
 }
 
 .row2 {
@@ -221,6 +235,33 @@
   margin-top: 3px;
   max-width: 460px;
   line-height: 1.45;
+}
+
+.checks {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #445162;
+  background: #f6f2ea;
+  padding: 9px 13px;
+  border-radius: 11px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.check input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--brand);
+  margin: 0;
 }
 
 .slider {

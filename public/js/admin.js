@@ -30,6 +30,14 @@ const MODES = [
   { id: 'memory', label: 'Memory' },
 ];
 
+const KINDS = [
+  { id: 'latin', label: 'A · Latin words / phrases' },
+  { id: 'chinese', label: 'B · Chinese words / phrases' },
+  { id: 'passage', label: 'C · Mixed passage' },
+];
+
+const KIND_LABEL = { latin: 'LATIN', chinese: '中文', passage: 'PASSAGE' };
+
 /* --------------------------------- helpers -------------------------------- */
 
 function markDirty() {
@@ -92,8 +100,25 @@ function segmented(options, value, onChange) {
   return seg;
 }
 
-function sliderField(labelText, desc, value, min, max, step, format, onChange) {
-  const out = h('output', {}, format(value));
+function checkRow(label, desc, options, values, onChange) {
+  const wrap = h('div', { class: 'checks' });
+  for (const opt of options) {
+    const cb = h('input', {
+      type: 'checkbox',
+      checked: values.includes(opt.id),
+      onchange: () => onChange(opt.id, cb.checked),
+    });
+    wrap.append(h('label', { class: 'check' }, cb, opt.label));
+  }
+  return h(
+    'div',
+    { class: 'row-inline' },
+    h('div', {}, h('div', { class: 'rlabel' }, label), desc ? h('div', { class: 'rdesc' }, desc) : null),
+    wrap,
+  );
+}
+
+function sliderField(labelText, desc, value, min, max, step, format, onChange) {  const out = h('output', {}, format(value));
   const range = h('input', {
     type: 'range',
     min,
@@ -115,8 +140,8 @@ function sliderField(labelText, desc, value, min, max, step, format, onChange) {
   );
 }
 
-function langBadge(lang) {
-  return h('span', { class: `lang-badge ${lang}` }, lang === 'zh' ? '中文' : lang === 'bm' ? 'BM' : 'EN');
+function kindBadge(kind) {
+  return h('span', { class: `lang-badge ${kind}` }, KIND_LABEL[kind] || kind);
 }
 
 /* ---------------------------------- init ---------------------------------- */
@@ -338,8 +363,20 @@ function setsTab() {
             render();
           },
         },
-        h('div', { class: 'si-name' }, langBadge(set.lang), set.name, set.enabled ? null : h('span', { class: 'pill' }, 'off')),
-        h('div', { class: 'si-meta' }, `${set.items.length} items`),
+        h(
+          'div',
+          { class: 'si-name' },
+          kindBadge(set.kind || (set.lang === 'zh' ? 'chinese' : 'latin')),
+          set.name,
+          set.enabled ? null : h('span', { class: 'pill' }, 'off'),
+        ),
+        h(
+          'div',
+          { class: 'si-meta' },
+          `${set.items.length} ${set.kind === 'passage' ? 'passages' : 'items'}${
+            set.repeat > 1 ? ` · ×${set.repeat}` : ''
+          }`,
+        ),
       ),
     );
   }
@@ -354,16 +391,17 @@ function setsTab() {
         onclick: () => {
           const set = {
             id: `set-${Date.now().toString(36)}`,
+            kind: 'latin',
             lang: 'en',
             name: 'New word list',
             enabled: true,
+            repeat: 1,
             items: [{ text: 'cat' }],
           };
           state.config.sets.push(set);
           state.selectedId = set.id;
           markDirty();
           render();
-          requestAnimationFrame(() => document.querySelector('.field .input')?.focus());
         },
       },
       icon('plus'),
@@ -374,6 +412,10 @@ function setsTab() {
 
   let right;
   if (current) {
+    if (!current.kind) current.kind = current.lang === 'zh' ? 'chinese' : 'latin';
+    if (!current.repeat) current.repeat = 1;
+    const isPassage = current.kind === 'passage';
+
     const nameInput = h('input', {
       class: 'input',
       value: current.name,
@@ -384,41 +426,119 @@ function setsTab() {
       },
     });
 
-    const langSelect = h(
+    const typeSelect = h(
       'select',
       {
         class: 'select',
         onchange: (e) => {
-          current.lang = e.target.value;
+          current.kind = e.target.value;
+          if (current.kind === 'chinese') current.lang = 'zh';
+          else if (current.lang === 'zh') current.lang = 'en';
+          if (current.kind === 'passage') current.repeat = 1;
           markDirty();
           render();
         },
       },
-      ...LANGS.map((l) =>
+      ...KINDS.map((k) => h('option', { value: k.id, selected: k.id === current.kind }, k.label)),
+    );
+
+    const langSelect = h(
+      'select',
+      {
+        class: 'select',
+        disabled: current.kind === 'chinese',
+        onchange: (e) => {
+          current.lang = e.target.value;
+          markDirty();
+        },
+      },
+      ...LANGS.filter((l) => (current.kind === 'chinese' ? l.id === 'zh' : l.id !== 'zh')).map((l) =>
         h('option', { value: l.id, selected: l.id === current.lang }, l.label),
       ),
     );
 
-    const countTag = h('span', { class: 'pill' }, `${current.items.length} items`);
-    const textarea = h('textarea', {
-      class: 'textarea',
-      spellcheck: 'false',
-      value: itemsToText(current),
+    const repeatInput = h('input', {
+      class: 'input',
+      type: 'number',
+      min: '1',
+      max: '10',
+      value: current.repeat,
+      disabled: isPassage,
       oninput: (e) => {
-        current.items = parseItems(e.target.value);
-        countTag.textContent = `${current.items.length} items`;
+        const n = Math.round(Number(e.target.value));
+        current.repeat = Number.isFinite(n) ? Math.min(10, Math.max(1, n)) : 1;
         markDirty();
       },
     });
 
+    const countTag = h(
+      'span',
+      { class: 'pill' },
+      `${current.items.length} ${isPassage ? 'passages' : 'items'}`,
+    );
+
+    const textarea = h('textarea', {
+      class: `textarea${isPassage ? ' tall' : ''}`,
+      spellcheck: 'false',
+      wrap: 'soft',
+      value: itemsToText(current),
+      oninput: (e) => {
+        current.items = parseItems(e.target.value);
+        countTag.textContent = `${current.items.length} ${isPassage ? 'passages' : 'items'}`;
+        markDirty();
+      },
+    });
+
+    const help =
+      current.kind === 'chinese'
+        ? 'One word or phrase per line. Practised character by character. Pinyin and Wade-Giles are added automatically.'
+        : current.kind === 'passage'
+          ? 'One passage per line. Chinese and Latin can be mixed; each character or word is practised in turn.'
+          : 'One word or phrase per line. Practised letter by letter.';
+
     right = h(
       'div',
       {},
-      h('div', { class: 'row2' }, field('List name', nameInput), field('Language', langSelect)),
+      h('div', { class: 'row2' }, field('List name', nameInput), field('Type', typeSelect)),
+      h(
+        'div',
+        { class: 'row2' },
+        field(
+          'Language / voice',
+          langSelect,
+          current.kind === 'chinese'
+            ? 'Chinese is detected automatically.'
+            : 'Voice used to read the Latin words aloud.',
+        ),
+        field(
+          'Repeat each item',
+          repeatInput,
+          isPassage
+            ? 'Passages are written once.'
+            : 'How many times the child writes each word before moving on.',
+        ),
+      ),
       field(
-        'Words',
-        h('div', {}, textarea, h('div', { class: 'hint', style: { marginTop: '8px' } }, h('span', {}, 'One word per line. Add a meaning after a pipe: ', h('code', {}, 'cat | 猫 · kucing')), h('div', { style: { marginTop: '6px' } }, countTag))),
-        'Chinese: each line is practised character by character. English / BM: each line is practised letter by letter.',
+        isPassage ? 'Passages' : 'Words',
+        h(
+          'div',
+          {},
+          textarea,
+          h(
+            'div',
+            { class: 'hint', style: { marginTop: '8px' } },
+            h(
+              'span',
+              {},
+              isPassage ? 'Example: ' : 'Add a meaning after a pipe: ',
+              isPassage
+                ? h('code', {}, 'Good morning! 早上好！I go to school. 我去学校。')
+                : h('code', {}, 'cat | 猫 · kucing'),
+            ),
+            h('div', { style: { marginTop: '6px' } }, countTag),
+          ),
+        ),
+        help,
       ),
       switchRow(
         'Show this list in the app',
@@ -479,6 +599,12 @@ function practiceTab() {
   const p = state.config.practice;
   const app = state.config.app;
   const panel = h('div', { class: 'panel' });
+  const allowed =
+    Array.isArray(p.allowedModes) && p.allowedModes.length
+      ? p.allowedModes
+      : MODES.map((m) => m.id);
+  p.allowedModes = allowed;
+  if (!allowed.includes(p.mode)) p.mode = allowed[0];
 
   panel.append(
     field(
@@ -524,10 +650,34 @@ function practiceTab() {
         h('div', { class: 'rlabel' }, 'Starting guidance mode'),
         h('div', { class: 'rdesc' }, 'Trace = follow the guide. Copy = guide visible, check at the end. Memory = no guide.'),
       ),
-      segmented(MODES, p.mode, (mode) => {
-        p.mode = mode;
+      segmented(
+        MODES.filter((m) => allowed.includes(m.id)),
+        p.mode,
+        (mode) => {
+          p.mode = mode;
+          markDirty();
+        },
+      ),
+    ),
+    checkRow(
+      'Allowed modes',
+      'Untick a mode to hide it from the child. At least one must stay on.',
+      MODES,
+      allowed,
+      (id, checked) => {
+        const next = new Set(allowed);
+        if (checked) next.add(id);
+        else next.delete(id);
+        if (!next.size) {
+          toast('Keep at least one mode on');
+          render();
+          return;
+        }
+        p.allowedModes = MODES.map((m) => m.id).filter((m) => next.has(m));
+        if (!p.allowedModes.includes(p.mode)) p.mode = p.allowedModes[0];
         markDirty();
-      }),
+        render();
+      },
     ),
     h(
       'div',
@@ -624,6 +774,15 @@ function practiceTab() {
       p.showPinyin = v;
       markDirty();
     }),
+    switchRow(
+      'Show Wade-Giles',
+      'Also show 威氏拼音 (Wade-Giles) with tone numbers, e.g. ni³ hao³.',
+      p.showWadeGiles,
+      (v) => {
+        p.showWadeGiles = v;
+        markDirty();
+      },
+    ),
     switchRow('Show meaning', 'The translation you typed after the pipe.', p.showMeaning, (v) => {
       p.showMeaning = v;
       markDirty();
@@ -640,6 +799,15 @@ function practiceTab() {
       p.sound = v;
       markDirty();
     }),
+    switchRow(
+      'Read aloud',
+      'Speak the word automatically when it is finished (Hanyu Pinyin / English / Malay voice).',
+      p.speakOnComplete,
+      (v) => {
+        p.speakOnComplete = v;
+        markDirty();
+      },
+    ),
     switchRow('Pencil only', 'Ignore finger and palm touches (best with an Apple Pencil).', p.penOnly, (v) => {
       p.penOnly = v;
       markDirty();

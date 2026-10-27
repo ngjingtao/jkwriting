@@ -1,6 +1,6 @@
 const OVERRIDES_KEY = 'wf.overrides.v1';
 const LANG_KEY = 'wf.lang.v1';
-const ALLOWED = new Set(['mode', 'sound', 'penOnly', 'showNumbers', 'uiLang']);
+const ALLOWED = new Set(['mode', 'sound', 'penOnly', 'showNumbers', 'uiLang', 'speakOnComplete']);
 
 function read(key, fallback) {
   try {
@@ -45,6 +45,7 @@ export function getSettings(config) {
   const o = loadOverrides();
   return {
     mode: config.practice.mode,
+    allowedModes: config.practice.allowedModes,
     gridHanzi: config.practice.gridHanzi,
     gridLatin: config.practice.gridLatin,
     guideOpacity: config.practice.guideOpacity,
@@ -52,10 +53,12 @@ export function getSettings(config) {
     inkColor: config.practice.inkColor,
     boxScale: config.practice.boxScale,
     showPinyin: config.practice.showPinyin,
+    showWadeGiles: config.practice.showWadeGiles,
     showMeaning: config.practice.showMeaning,
     showNumbers: config.practice.showNumbers,
     autoNext: config.practice.autoNext,
     sound: config.practice.sound,
+    speakOnComplete: config.practice.speakOnComplete,
     penOnly: config.practice.penOnly,
     uiLang: config.app.uiLang,
     tolerance: config.scoring.tolerance,
@@ -67,7 +70,7 @@ export function getSettings(config) {
 
 export function getHomeLang() {
   const stored = read(LANG_KEY, 'zh');
-  return ['zh', 'en', 'bm'].includes(stored) ? stored : 'zh';
+  return ['zh', 'en', 'bm', 'passage'].includes(stored) ? stored : 'zh';
 }
 
 export function setHomeLang(lang) {
