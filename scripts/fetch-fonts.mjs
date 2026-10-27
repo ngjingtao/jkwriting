@@ -1,4 +1,4 @@
-// One-off: download the self-hosted Latin webfonts (Nunito for UI, Patrick Hand
+// One-off: download the self-hosted Latin webfonts (Nunito for UI, Didact Gothic
 // for handwriting models) plus their OFL licences.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -18,10 +18,10 @@ const families = [
     variable: true,
   },
   {
-    name: 'Patrick Hand',
-    query: 'family=Patrick+Hand',
+    name: 'Didact Gothic',
+    query: 'family=Didact+Gothic',
     weights: ['400'],
-    slug: 'patrick',
+    slug: 'didact',
     variable: false,
   },
 ];
@@ -57,7 +57,7 @@ for (const family of families) {
 
 const licences = [
   ['OFL-Nunito.txt', 'https://raw.githubusercontent.com/googlefonts/nunito/main/OFL.txt'],
-  ['OFL-PatrickHand.txt', 'https://raw.githubusercontent.com/google/fonts/main/ofl/patrickhand/OFL.txt'],
+  ['OFL-DidactGothic.txt', 'https://raw.githubusercontent.com/google/fonts/main/ofl/didactgothic/OFL.txt'],
 ];
 for (const [name, url] of licences) {
   try {
