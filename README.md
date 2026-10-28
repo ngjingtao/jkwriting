@@ -35,6 +35,10 @@ The default admin PIN is **2468** — set `ADMIN_PIN` before using it anywhere p
 ADMIN_PIN=1234 npm start
 ```
 
+To use Postgres locally, copy `.env.example` to `.env` and set `DATABASE_URL`
+(`npm start` loads `.env` automatically); without it the app uses
+`data/store.json` and `localStorage`.
+
 ---
 
 ## Using it on the iPad
