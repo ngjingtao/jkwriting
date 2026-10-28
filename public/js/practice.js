@@ -144,9 +144,13 @@ export class Practice {
       { class: 'p-head' },
       backBtn,
       h('div', { class: 'p-title' }, this.wordEl, this.pinyinEl, this.wgEl),
-      h('div', { class: 'p-meta' }, this.progressEl, this.roundEl),
-      speakBtn,
-      settingsBtn,
+      h(
+        'div',
+        { class: 'p-right' },
+        h('div', { class: 'p-meta' }, this.progressEl, this.roundEl),
+        speakBtn,
+        settingsBtn,
+      ),
     );
 
     this.modeRow = h('div', { class: 'mode-pills', role: 'group' });
