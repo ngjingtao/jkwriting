@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { DEFAULT_CONFIG } from './defaults.js';
+import { DEFAULT_CONFIG, CONFIG_VERSION } from './defaults.js';
 
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
@@ -125,8 +125,11 @@ export function sanitizeConfig(raw) {
   let mode = oneOf(practice.mode, ['trace', 'copy', 'memory'], base.practice.mode);
   if (!allowedModes.includes(mode)) mode = allowedModes[0];
 
+  const strokes = cleanStrokes(src.strokes);
+  const seeded = Number(src.version) >= CONFIG_VERSION ? strokes : { ...base.strokes, ...strokes };
+
   return {
-    version: 1,
+    version: CONFIG_VERSION,
     app: {
       title: cleanText(app.title, 40) || base.app.title,
       uiLang: oneOf(app.uiLang, ['en', 'zh', 'ms'], base.app.uiLang),
@@ -154,7 +157,7 @@ export function sanitizeConfig(raw) {
       threshold: clampNum(scoring.threshold, base.scoring.threshold, 0.2, 0.95),
       showTips: bool(scoring.showTips, base.scoring.showTips),
     },
-    strokes: cleanStrokes(src.strokes),
+    strokes: seeded,
     sets: sets.length ? sets : base.sets,
   };
 }

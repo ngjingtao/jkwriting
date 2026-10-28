@@ -1,8 +1,15 @@
 // Default configuration and starter word lists.
 // Everything here can be changed later from /admin (and is stored in data/store.json).
 
+import { STROKE_OVERRIDES } from './stroke-seed.js';
+
+// Bump CONFIG_VERSION when the shipped defaults must reach existing stores once.
+// Stores written before this version get the stroke seed merged in; after that,
+// deleting an override in /strokes sticks.
+export const CONFIG_VERSION = 2;
+
 export const DEFAULT_CONFIG = {
-  version: 1,
+  version: CONFIG_VERSION,
   app: {
     title: 'Writing Fun',
     uiLang: 'en', // en | zh | ms
@@ -30,7 +37,7 @@ export const DEFAULT_CONFIG = {
     threshold: 0.5,
     showTips: true,
   },
-  strokes: {},
+  strokes: STROKE_OVERRIDES,
   sets: [
     {
       id: 'zh-numbers',
