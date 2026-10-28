@@ -9,7 +9,7 @@
 // visible letter scores correctly.
 
 import { latinStrokes } from './glyphs.js';
-import { glyphSkeleton } from './skeleton.js';
+import { glyphField } from './skeleton.js';
 import { resample } from './scoring.js';
 
 export const LATIN_SIZE_RATIO = 0.86;
@@ -226,22 +226,108 @@ function joinCorners(ch, fitted) {
   }
 }
 
+function traceOnSkeleton(stroke, skeleton, tolerance = 0.055) {
+  if (skeleton.length < 8) return null;
+  const cumulative = [0];
+  for (let i = 1; i < stroke.length; i += 1) {
+    cumulative.push(
+      cumulative[i - 1] + Math.hypot(stroke[i][0] - stroke[i - 1][0], stroke[i][1] - stroke[i - 1][1]),
+    );
+  }
+  const total = cumulative[cumulative.length - 1];
+  if (total < 1e-6) return null;
+
+  const samples = [];
+  for (const [sx, sy] of skeleton) {
+    let bestT = 0;
+    let bestDistance = Infinity;
+    for (let i = 1; i < stroke.length; i += 1) {
+      const ax = stroke[i - 1][0];
+      const ay = stroke[i - 1][1];
+      const bx = stroke[i][0];
+      const by = stroke[i][1];
+      const dx = bx - ax;
+      const dy = by - ay;
+      const lengthSq = dx * dx + dy * dy || 1;
+      let t = ((sx - ax) * dx + (sy - ay) * dy) / lengthSq;
+      t = Math.max(0, Math.min(1, t));
+      const distance = Math.hypot(sx - (ax + dx * t), sy - (ay + dy * t));
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestT = (cumulative[i - 1] + Math.sqrt(lengthSq) * t) / total;
+      }
+    }
+    if (bestDistance <= tolerance) samples.push({ t: bestT, point: [sx, sy] });
+  }
+
+  if (samples.length < 4) return null;
+  samples.sort((a, b) => a.t - b.t);
+
+  const points = [];
+  for (const sample of samples) {
+    const last = points[points.length - 1];
+    if (!last || Math.hypot(sample.point[0] - last[0], sample.point[1] - last[1]) > 0.003) {
+      points.push(sample.point);
+    }
+  }
+  if (points.length < 3) return null;
+  return resample(points, 20);
+}
+
+/** Pull a traced path onto the centre of the thick font stroke. */
+function centerOnRidge(path, field) {
+  if (!field?.dist) return path;
+  const { dist, size } = field;
+  const radius = Math.max(2, Math.round(0.04 * size));
+  return path.map((point, index) => {
+    if (index === 0 || index === path.length - 1) return point;
+    const px = Math.round(point[0] * size);
+    const py = Math.round(point[1] * size);
+    let best = point;
+    let bestDistance = -1;
+    for (let dy = -radius; dy <= radius; dy += 1) {
+      for (let dx = -radius; dx <= radius; dx += 1) {
+        if (dx * dx + dy * dy > radius * radius) continue;
+        const x = px + dx;
+        const y = py + dy;
+        if (x < 1 || y < 1 || x >= size - 1 || y >= size - 1) continue;
+        const value = dist[y * size + x];
+        if (value > bestDistance) {
+          bestDistance = value;
+          best = [x / size, y / size];
+        }
+      }
+    }
+    return best;
+  });
+}
+
 function fit(ch) {
   const raw = latinStrokes(ch);
   if (!raw) return null;
   const aligned = affineFit(ch, raw);
-  let skeleton = [];
+  let field = null;
   try {
-    skeleton = glyphSkeleton(ch, {
+    field = glyphField(ch, {
       family: LATIN_FAMILY,
       sizeRatio: LATIN_SIZE_RATIO,
       baseline: LATIN_BASELINE,
     });
   } catch {
-    skeleton = [];
+    field = null;
   }
+  const skeleton = field?.points || [];
   if (skeleton.length < 12) return aligned;
-  const fitted = aligned.map((stroke) => snapStroke(stroke, skeleton));
+
+  const fitted = aligned.map((stroke) => {
+    if (stroke.length === 2) {
+      return [snapPoint(stroke[0], skeleton), snapPoint(stroke[1], skeleton)];
+    }
+    const traced = traceOnSkeleton(stroke, skeleton);
+    if (!traced) return snapStroke(stroke, skeleton);
+    const centered = centerOnRidge(traced, field);
+    return resample(centered, 20);
+  });
   reconcileEndpoints(aligned, fitted);
   enforceAxes(aligned, fitted);
   joinCorners(ch, fitted);

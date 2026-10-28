@@ -1,5 +1,5 @@
 import { pathLength } from './scoring.js';
-import { LATIN_BASELINE, LATIN_FAMILY, latinMetrics } from './fontfit.js';
+import { LATIN_SIZE_RATIO, LATIN_BASELINE, LATIN_FAMILY, latinMetrics } from './fontfit.js';
 
 const ACCENT = '#4f46e5';
 const RED = '#ef4444';
@@ -534,13 +534,7 @@ export class WritingSurface {
     if (!this.unit) return;
     const alpha = this.opts.guideOpacity;
     if (this.unit.script === 'latin') {
-      // Draw the ghost from the same fitted path as the guide, so the two can
-      // never drift apart. The path is snapped to the Didact glyph centreline.
-      const width = this.box.size * this.opts.inkWidth * 0.92;
-      const ghostAlpha = Math.min(0.5, alpha * 1.6);
-      for (const s of this.unit.strokes) {
-        this._strokePolyline(ctx, s.median, width, GHOST, ghostAlpha);
-      }
+      this._drawLatinText(ctx, this.unit.char, GHOST, Math.min(0.55, alpha * 2.2));
       return;
     }
     for (const s of this.unit.strokes) {
@@ -549,6 +543,26 @@ export class WritingSurface {
         this._strokePolyline(ctx, s.median, this.box.size * this.opts.inkWidth * 0.9, GHOST, alpha);
       }
     }
+  }
+
+  _drawLatinText(ctx, text, color, alpha) {
+    const size = this.box.size;
+    const fontSize = size * LATIN_SIZE_RATIO;
+    const x = this.box.x + size / 2;
+    const y = this.box.y + size * LATIN_BASELINE;
+    ctx.save();
+    ctx.font = `400 ${fontSize}px ${LATIN_FAMILY}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.fillText(text || '', x, y);
+    // A slightly stronger outline keeps the model legible on bright screens.
+    ctx.globalAlpha = Math.min(0.85, alpha + 0.18);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1, size * 0.0022);
+    ctx.strokeText(text || '', x, y);
+    ctx.restore();
   }
 
   get _isLatin() {
