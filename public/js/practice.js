@@ -76,6 +76,12 @@ export class Practice {
       this.hintEl.classList.remove('show');
     };
     this.surface.onStrokeEnd = (rec) => this._strokeEnd(rec);
+    this.surface.onTouchBlocked = (reason) => {
+      if (reason === 'penOnly' && !this._warnedPenOnly) {
+        this._warnedPenOnly = true;
+        toast(this.t('toast.penOnly'));
+      }
+    };
     setSound(this.settings.sound);
     setSpeechEnabled(this.settings.speakOnComplete !== false);
 

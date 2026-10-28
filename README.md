@@ -41,7 +41,7 @@ ADMIN_PIN=1234 npm start
 
 1. Deploy (see below) and open the URL in **Safari**.
 2. Tap **Share → Add to Home Screen**. It opens full screen like an app.
-3. In the parent page, turn on **Practice → Pencil only** so finger and palm touches are ignored.
+3. Optional: in the parent page, turn on **Practice → Pencil only** to ignore finger and palm touches. Leave it off to write with a finger as well.
 4. Practise. The first time a Chinese character is used it downloads its stroke data and caches it on the device, so it works offline afterwards.
 
 > Tip: lock the iPad in landscape or portrait — the practice box adapts to both. Disable the iPad's "Scribble" if it interferes with writing.

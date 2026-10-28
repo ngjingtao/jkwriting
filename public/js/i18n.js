@@ -90,6 +90,7 @@ const en = {
   'settings.off': 'Off',
 
   'toast.noInk': 'Write something first',
+  'toast.penOnly': 'Pencil only is on — turn it off in Settings to write with a finger.',
   'toast.noData': 'That character has no stroke data',
   'toast.loadFail': 'Could not load. Check your connection.',
   'common.retry': 'Retry',
@@ -187,6 +188,7 @@ const zh = {
   'settings.off': '关',
 
   'toast.noInk': '先写一写吧',
+  'toast.penOnly': '开启了“只用手写笔”，请到设置里关闭后才能用手指写字。',
   'toast.noData': '这个字暂时没有笔顺数据',
   'toast.loadFail': '加载失败，请检查网络',
   'common.retry': '重试',
@@ -284,6 +286,7 @@ const ms = {
   'settings.off': 'Tutup',
 
   'toast.noInk': 'Tulis dahulu',
+  'toast.penOnly': "Mod 'Pensel sahaja' aktif — matikan dalam Tetapan untuk menulis dengan jari.",
   'toast.noData': 'Aksara ini tiada data strok',
   'toast.loadFail': 'Gagal memuatkan. Semak sambungan.',
   'common.retry': 'Cuba lagi',

@@ -63,6 +63,7 @@ export class WritingSurface {
     this.flashAt = 0;
     this.onStrokeEnd = null;
     this.onStrokeStart = null;
+    this.onTouchBlocked = null;
     this.dpr = Math.min(3, window.devicePixelRatio || 1);
     this.box = { x: 0, y: 0, size: 1 };
     this.cssW = 1;
@@ -311,10 +312,15 @@ export class WritingSurface {
       this._lastPen = performance.now();
       return true;
     }
-    if (this.opts.penOnly) return false;
     if (e.pointerType === 'mouse') return true;
-    if (this._hasPen && performance.now() - this._lastPen < 2500) return false;
-    if (e.pointerType === 'touch' && (e.width || 0) > 42) return false;
+    if (e.pointerType !== 'touch') return true;
+    if (this.opts.penOnly) {
+      this.onTouchBlocked?.('penOnly');
+      return false;
+    }
+    if (this._hasPen && performance.now() - this._lastPen < 2200) return false;
+    // Only reject a palm-sized blob, never a normal fingertip.
+    if ((e.width || 0) > 90 || (e.height || 0) > 90) return false;
     return true;
   }
 
