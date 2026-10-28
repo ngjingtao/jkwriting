@@ -17,9 +17,20 @@ export const LATIN_BASELINE = 0.765;
 export const LATIN_FAMILY = "'Didact Gothic', 'Nunito', sans-serif";
 
 const cache = new Map();
+let overrides = {};
 let ctx = null;
 let fontReady = null;
 let metricsCache = null;
+
+/** Manual stroke overrides loaded from the server config. */
+export function setStrokeOverrides(next) {
+  overrides = next && typeof next === 'object' ? next : {};
+  cache.clear();
+}
+
+export function getStrokeOverrides() {
+  return overrides;
+}
 
 function context() {
   if (!ctx) {
@@ -331,11 +342,65 @@ function fit(ch) {
   reconcileEndpoints(aligned, fitted);
   enforceAxes(aligned, fitted);
   joinCorners(ch, fitted);
+  fixSegments(ch, fitted);
   return fitted;
 }
 
-/** Stroke medians for a Latin character, matched to the Didact glyph. */
+function fixSegments(ch, fitted) {
+  if (!fitted?.length) return;
+
+  if (ch === 'u' && fitted.length === 2) {
+    const [uStroke, stem] = fitted;
+    if (uStroke.length > 2 && stem.length === 2) {
+      let bottom = 0;
+      for (let i = 1; i < uStroke.length; i += 1) {
+        if (uStroke[i][1] > uStroke[bottom][1]) bottom = i;
+      }
+      const trimmed = uStroke.slice(0, bottom + 1);
+      trimmed.push([stem[0][0], stem[1][1]]);
+      fitted[0] = trimmed;
+    }
+    return;
+  }
+
+  if (ch === 'r' && fitted.length === 2) {
+    const [stem, arm] = fitted;
+    if (stem.length === 2 && arm.length > 2) {
+      const top = stem[0];
+      const end = arm[arm.length - 1];
+      fitted[1] = [
+        top,
+        [top[0] + 0.035, top[1] + 0.008],
+        [0.5, 0.398],
+        [0.575, 0.386],
+        end,
+      ];
+    }
+    return;
+  }
+
+  if (['a', 'b', 'd', 'g', 'p', 'q'].includes(ch) && fitted.length === 2) {
+    const bowl = fitted.find((stroke) => stroke.length > 2);
+    const other = fitted.find((stroke) => stroke !== bowl);
+    if (bowl && other) {
+      const x = other[0][0];
+      const last = bowl[bowl.length - 1];
+      if (Math.abs(last[0] - x) > 0.008 || Math.abs(last[1] - 0.73) > 0.008) {
+        bowl[bowl.length - 1] = [x, 0.73];
+      }
+    }
+  }
+}
+
+/** Stroke medians for a Latin character, using a manual override when present. */
 export function fittedLatinStrokes(ch) {
+  const custom = overrides[ch];
+  if (Array.isArray(custom) && custom.length) return custom;
+  return autoLatinStrokes(ch);
+}
+
+/** The generated/auto-fitted strokes, ignoring manual overrides. */
+export function autoLatinStrokes(ch) {
   if (!cache.has(ch)) cache.set(ch, fit(ch));
   return cache.get(ch);
 }

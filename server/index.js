@@ -125,6 +125,7 @@ app.get('/api/admin/status', requireAdmin, (req, res) => {
 /* -------------------------------- static -------------------------------- */
 
 app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
+app.get('/strokes', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'strokes.html')));
 
 app.use(
   express.static(PUBLIC_DIR, {

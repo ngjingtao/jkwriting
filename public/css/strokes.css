@@ -1,0 +1,260 @@
+.editor {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: max(16px, env(safe-area-inset-top)) 16px 40px;
+}
+
+.editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.editor-head .brand h1 {
+  font-size: 20px;
+}
+
+.editor-head .brand p {
+  font-size: 12.5px;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.status-pill {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.status-pill.dirty {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.editor-grid {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 310px;
+  gap: 16px;
+  align-items: start;
+}
+
+.panel-box {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 14px;
+  box-shadow: 0 2px 0 rgba(31, 42, 55, 0.02);
+}
+
+.panel-box h2 {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.char-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 5px;
+  max-height: 430px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.char-btn {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--ink);
+  background: #fdfcf9;
+}
+
+.char-btn:hover {
+  border-color: #cfc6b6;
+}
+
+.char-btn.active {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+
+.char-btn .dot {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.canvas-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 10px;
+  box-shadow: 0 2px 0 rgba(31, 42, 55, 0.02);
+}
+
+.canvas-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+}
+
+.canvas-wrap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  border-radius: 14px;
+  cursor: crosshair;
+}
+
+.editor-hint {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 8px 4px 2px;
+}
+
+.stroke-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  margin-bottom: 6px;
+  background: #fdfcf9;
+}
+
+.stroke-row.active {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.stroke-row .swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  flex: none;
+}
+
+.stroke-row .s-label {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.stroke-row .mini {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  background: #fff;
+}
+
+.stroke-row .mini:hover {
+  background: #f4f0e9;
+}
+
+.tool-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tool-grid .btn {
+  min-height: 38px;
+  padding: 7px 8px;
+  font-size: 12.5px;
+  border-radius: 10px;
+}
+
+.tool-grid .span2 {
+  grid-column: 1 / -1;
+}
+
+.point-info {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 8px;
+}
+
+.login-wrap {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.login-card {
+  width: min(420px, 100%);
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 26px;
+  padding: 28px;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.login-card h1 {
+  font-size: 21px;
+  margin-bottom: 8px;
+}
+
+.login-card p {
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 1100px) {
+  .editor-grid {
+    grid-template-columns: 1fr;
+  }
+  .char-grid {
+    grid-template-columns: repeat(13, 1fr);
+    max-height: none;
+  }
+  .canvas-wrap {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .char-grid {
+    grid-template-columns: repeat(8, 1fr);
+  }
+  .editor-head .brand p {
+    display: none;
+  }
+}

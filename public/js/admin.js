@@ -272,6 +272,11 @@ function header() {
       { style: { display: 'flex', gap: '8px', flexWrap: 'wrap' } },
       h('a', { class: 'btn ghost sm', href: '/', style: { textDecoration: 'none' } }, 'Open app'),
       h(
+        'a',
+        { class: 'btn ghost sm', href: '/strokes', style: { textDecoration: 'none' } },
+        'Stroke editor',
+      ),
+      h(
         'button',
         {
           class: 'btn ghost sm',

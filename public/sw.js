@@ -1,6 +1,6 @@
 /* Offline shell for the iPad home-screen app.
    Bump VERSION when you deploy changed app files. */
-const VERSION = 'writing-fun-v14';
+const VERSION = 'writing-fun-v15';
 const SHELL = [
   '/',
   '/index.html',
@@ -68,7 +68,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin')) return;
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin') || url.pathname.startsWith('/strokes')) return;
 
   if (req.mode === 'navigate') {
     event.respondWith(networkFirst(req, '/index.html'));

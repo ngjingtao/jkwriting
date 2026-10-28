@@ -30,6 +30,7 @@ export const DEFAULT_CONFIG = {
     threshold: 0.5,
     showTips: true,
   },
+  strokes: {},
   sets: [
     {
       id: 'zh-numbers',

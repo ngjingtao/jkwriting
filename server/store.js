@@ -39,6 +39,29 @@ const cleanText = (v, max) =>
     .trim()
     .slice(0, max);
 
+function cleanStrokes(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [ch, value] of Object.entries(raw).slice(0, 200)) {
+    if (!/^[A-Za-z0-9]$/.test(ch) || !Array.isArray(value)) continue;
+    const strokes = [];
+    for (const stroke of value.slice(0, 8)) {
+      if (!Array.isArray(stroke) || stroke.length < 2 || stroke.length > 80) continue;
+      const points = [];
+      for (const point of stroke) {
+        if (!Array.isArray(point) || point.length < 2) continue;
+        const x = Number(point[0]);
+        const y = Number(point[1]);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        points.push([Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y))]);
+      }
+      if (points.length >= 2) strokes.push(points);
+    }
+    if (strokes.length) out[ch] = strokes;
+  }
+  return out;
+}
+
 function cleanItem(raw, maxText = 24) {
   if (!raw) return null;
   const text = cleanText(typeof raw === 'string' ? raw : raw.text, maxText);
@@ -131,6 +154,7 @@ export function sanitizeConfig(raw) {
       threshold: clampNum(scoring.threshold, base.scoring.threshold, 0.2, 0.95),
       showTips: bool(scoring.showTips, base.scoring.showTips),
     },
+    strokes: cleanStrokes(src.strokes),
     sets: sets.length ? sets : base.sets,
   };
 }

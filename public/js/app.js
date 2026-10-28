@@ -1,5 +1,6 @@
 import { fetchConfig } from './api.js';
 import { Practice } from './practice.js';
+import { setStrokeOverrides } from './fontfit.js';
 import { h, icon, openSheet, switchRow, segmented, clear } from './ui.js';
 import { getSettings, getHomeLang, setHomeLang, setOverride, clearOverrides } from './settings.js';
 import { makeT } from './i18n.js';
@@ -26,6 +27,7 @@ async function boot() {
     return;
   }
   const settings = getSettings(state.config);
+  setStrokeOverrides(state.config.strokes || {});
   setSound(settings.sound);
   setSpeechEnabled(settings.speakOnComplete !== false);
   renderHome();

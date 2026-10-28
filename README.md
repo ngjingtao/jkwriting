@@ -108,6 +108,20 @@ Render's free plan has an **ephemeral disk**: `data/store.json` is lost when the
 | **Scoring** | Tolerance (gentle / normal / strict), pass mark per stroke, coaching tips. |
 | **Backup** | Export / import JSON, reset to defaults, storage + gist status. |
 
+### Stroke editor (`/strokes`)
+
+Open **Stroke editor** from the parent page header (it uses the same PIN session).
+
+- Pick a character (a–z, A–Z, 0–9).
+- **Drag any point**; **double-click a line** to insert a point.
+- Select a point and use **Split here** to break a stroke in two.
+- **+ Stroke**, **− Point**, **⇄** (reverse), **↑ ↓** (order) change the structure.
+- **Use auto fit** restores the generated guide; **Undo** and arrow-key nudging help fine-tuning.
+- **Save strokes** stores the override in `config.strokes` on the server (included in Backup/Gist).
+- The practice app uses the same override for the visible guide **and** the scoring — reload the app after saving.
+
+The generated guide already handles `p/q/r/u/a/b` with separate stem/bowl/arm strokes; the editor is there for any character that still needs a hand.
+
 ### Word list rules
 
 - **A · Latin words / phrases** practise **one letter at a time**; spaces and punctuation are skipped (`good morning` → g,o,o,d,m,o,r,n,i,n,g). Repeat runs the whole word again.
