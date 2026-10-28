@@ -1,4 +1,13 @@
+// Practice history. localStorage is the instant/offline copy; when the server
+// has a database configured, /api/progress merges it so the same stars and
+// words show up on every device.
+
 const KEY = 'wf.history.v1';
+const MAX = 500;
+const PROFILE = 'family';
+const SYNC_INTERVAL = 60000;
+
+const keyOf = (entry) => `${entry.ts}|${entry.text}`;
 
 export function getHistory() {
   try {
@@ -9,15 +18,97 @@ export function getHistory() {
   }
 }
 
-export function addEntry(entry) {
-  const list = getHistory();
-  list.push({ ts: Date.now(), ...entry });
+function saveHistory(list) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(list.slice(-500)));
+    localStorage.setItem(KEY, JSON.stringify(list.slice(-MAX)));
   } catch {
     /* ignore quota */
   }
 }
+
+function mergeLists(...lists) {
+  const byKey = new Map();
+  for (const entry of lists.flat()) {
+    if (!entry || !entry.ts || !entry.text) continue;
+    byKey.set(keyOf(entry), entry);
+  }
+  return [...byKey.values()].sort((a, b) => a.ts - b.ts).slice(-MAX);
+}
+
+function announce(changed) {
+  window.dispatchEvent(new CustomEvent('wf:progress', { detail: { changed } }));
+}
+
+/* ---------------------------------- sync ---------------------------------- */
+
+let inFlight = null;
+let pushTimer = null;
+
+export async function syncProgress() {
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return { ok: false, offline: true };
+  if (inFlight) return inFlight;
+  inFlight = (async () => {
+    try {
+      const local = getHistory();
+      const res = await fetch(`/api/progress?profile=${PROFILE}`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(9000),
+      });
+      if (!res.ok) return { ok: false };
+      const data = await res.json();
+      const remote = Array.isArray(data.entries) ? data.entries : [];
+      const merged = mergeLists(local, remote);
+      const changed = JSON.stringify(merged) !== JSON.stringify(local);
+      if (changed) saveHistory(merged);
+      if (data.stored) {
+        const known = new Set(remote.map(keyOf));
+        const missing = merged.filter((entry) => !known.has(keyOf(entry)));
+        if (missing.length) {
+          await fetch('/api/progress', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ profile: PROFILE, entries: missing }),
+            signal: AbortSignal.timeout(9000),
+          });
+        }
+      }
+      if (changed) announce(true);
+      return { ok: true, stored: Boolean(data.stored), merged: merged.length };
+    } catch {
+      return { ok: false };
+    } finally {
+      inFlight = null;
+    }
+  })();
+  return inFlight;
+}
+
+function scheduleSync(delay = 1500) {
+  clearTimeout(pushTimer);
+  pushTimer = setTimeout(() => {
+    syncProgress();
+  }, delay);
+}
+
+export function initHistorySync() {
+  syncProgress();
+  setInterval(() => syncProgress(), SYNC_INTERVAL);
+  window.addEventListener('online', () => syncProgress());
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncProgress();
+  });
+}
+
+/* ---------------------------------- write --------------------------------- */
+
+export function addEntry(entry) {
+  const list = mergeLists(getHistory(), [{ ts: Date.now(), ...entry }]);
+  saveHistory(list);
+  announce(false);
+  scheduleSync();
+}
+
+/* ---------------------------------- stats --------------------------------- */
 
 export function stats() {
   const list = getHistory();

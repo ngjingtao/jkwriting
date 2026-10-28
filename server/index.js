@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig, resetConfig, syncState } from './store.js';
+import { loadProgress, saveProgress } from './progress-store.js';
 import { getHanzi } from './hanzi.js';
 import {
   checkPin,
@@ -33,7 +34,7 @@ app.use((req, res, next) => {
 /* ------------------------------ public API ------------------------------ */
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, uptime: Math.round(process.uptime()) });
+  res.json({ ok: true, uptime: Math.round(process.uptime()), storage: syncState.storage });
 });
 
 app.get('/api/config', async (req, res, next) => {
@@ -51,6 +52,27 @@ app.get('/api/hanzi/:char', async (req, res, next) => {
     if (!data) return res.status(404).json({ error: 'no_stroke_data' });
     res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
     res.json(data);
+  } catch (err) {
+    next(err);
+  }
+});
+
+/* ---------------------------- progress (sync) --------------------------- */
+
+app.get('/api/progress', async (req, res, next) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await loadProgress(req.query.profile));
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/progress', async (req, res, next) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await saveProgress(body.profile, body.entries));
   } catch (err) {
     next(err);
   }
@@ -116,6 +138,8 @@ app.post('/api/admin/reset', requireAdmin, async (req, res, next) => {
 app.get('/api/admin/status', requireAdmin, (req, res) => {
   res.json({
     gist: syncState.gist,
+    db: syncState.db,
+    storage: syncState.storage,
     lastSyncAt: syncState.lastSyncAt,
     lastError: syncState.lastError,
     defaultPin: usingDefaultPin,

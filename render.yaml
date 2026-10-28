@@ -12,9 +12,22 @@ services:
         value: "22"
       - key: ADMIN_PIN
         sync: false
-      # Optional: keep settings across redeploys on the free plan.
-      # Create a secret gist, then set these two variables in Render.
+      # Postgres: word lists, settings, stroke guides and practice history.
+      # Applied automatically by the blueprint below; delete these two lines
+      # (and the `databases:` block) if you use Neon/Supabase instead and
+      # paste their URL into DATABASE_URL by hand.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: writing-fun-db
+          property: connectionString
+      # Optional: keep settings across redeploys without a database.
       - key: GIST_ID
         sync: false
       - key: GITHUB_TOKEN
         sync: false
+
+databases:
+  - name: writing-fun-db
+    plan: free
+    databaseName: writing_fun
+    user: writing_fun

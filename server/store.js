@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { DEFAULT_CONFIG, CONFIG_VERSION } from './defaults.js';
+import { dbState, initDb, dbReadConfig, dbWriteConfig } from './db.js';
 
 export const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
@@ -15,6 +16,12 @@ export const syncState = {
   gist: Boolean(GIST_ID && GITHUB_TOKEN),
   lastSyncAt: 0,
   lastError: '',
+  get db() {
+    return dbState.enabled;
+  },
+  get storage() {
+    return dbState.kind;
+  },
 };
 
 /* ------------------------------------------------------------------ */
@@ -227,12 +234,31 @@ async function readDisk() {
 
 export async function loadConfig() {
   if (cache) return cache;
-  let raw = await readDisk();
+  await initDb();
+  let raw = null;
+  let fromDb = false;
+  if (dbState.enabled) {
+    try {
+      raw = await dbReadConfig();
+      fromDb = Boolean(raw);
+    } catch (err) {
+      dbState.lastError = err.message;
+      console.warn('[store] database read failed:', err.message);
+    }
+  }
+  if (!raw) raw = await readDisk();
   if (!raw) raw = await gistLoad();
   cache = sanitizeConfig(raw || DEFAULT_CONFIG);
   if (!raw) {
     // Persist the defaults so the admin page has a stable file to edit.
     await writeDisk(cache).catch(() => {});
+  }
+  if (dbState.enabled && !fromDb) {
+    // First run with a database (or a store migrated from the file/gist).
+    await dbWriteConfig(cache).catch((err) => {
+      dbState.lastError = err.message;
+      console.warn('[store] database seed failed:', err.message);
+    });
   }
   return cache;
 }
@@ -247,7 +273,20 @@ async function writeDisk(config) {
 export async function saveConfig(raw) {
   const config = sanitizeConfig(raw);
   cache = config;
-  await writeDisk(config);
+  if (dbState.enabled) {
+    try {
+      await dbWriteConfig(config);
+      syncState.lastSyncAt = Date.now();
+      syncState.lastError = '';
+    } catch (err) {
+      dbState.lastError = err.message;
+      console.warn('[store] database save failed:', err.message);
+    }
+  }
+  // The file is a local cache and the fallback when no database is configured.
+  await writeDisk(config).catch((err) => {
+    console.warn('[store] disk save failed:', err.message);
+  });
   await gistSave(config);
   return config;
 }

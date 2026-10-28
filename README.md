@@ -78,13 +78,36 @@ git push -u origin main
 - Environment variables:
   - `ADMIN_PIN` — your parent PIN (required in practice)
   - `NODE_VERSION` = `22`
+  - `DATABASE_URL` — Postgres connection string (see below; recommended)
   - optional: `GIST_ID`, `GITHUB_TOKEN` (see below)
 
 Every push to `main` redeploys automatically.
 
-### 3. Keep settings across redeploys (free plan)
+### 3. Store everything in a database (recommended)
 
-Render's free plan has an **ephemeral disk**: `data/store.json` is lost when the service redeploys. Two options:
+With `DATABASE_URL` set, the app keeps in Postgres:
+
+- word lists, practice/scoring settings and the hand-adjusted stroke guides (`config`),
+- the practice history behind the Progress tab (stars, streak, recent words).
+
+That means the same data follows you across machines, redeploys and a fresh Render service — nothing lives on the ephemeral disk any more.
+
+1. Create a Postgres database: **Render → New → Postgres** (works), or free tiers at **Neon**, **Supabase** or **Railway**.
+2. Copy its connection string (`postgresql://user:pass@host/db`). If it says `postgres://`, that works too.
+3. In Render → your web service → **Environment**, add `DATABASE_URL` with that value, then **Manual Deploy → Deploy latest commit**.
+4. Fire up the app: the tables (`wf_config`, `wf_progress`) are created automatically on first boot, the existing `data/store.json` (if any) is copied into the database once, and the parent page shows **“Postgres database: on”** under Backup.
+
+Notes:
+
+- Tables are created automatically; no migration step.
+- Managed providers need SSL — it is enabled automatically for non-local hosts. For an unusual setup set `PGSSL=off` (no SSL) or `PGSSL=require` (strict verification).
+- The free tier of Render Postgres expires after 30 days; Neon/Supabase free tiers are fine for a family.
+- Practice history is merged, not overwritten: two iPads can practice offline and both sets of words appear after they sync (debounced push on new words, pull on boot and every minute).
+- Without `DATABASE_URL` the app keeps using `data/store.json` plus `localStorage` for history.
+
+### 4. Keep settings across redeploys without a database
+
+If you skip the database, Render's free plan has an **ephemeral disk**: `data/store.json` is lost when the service redeploys.
 
 **A. Export / Import** — the **Backup** tab downloads your config as JSON; import it after a redeploy.
 
@@ -97,6 +120,8 @@ Render's free plan has an **ephemeral disk**: `data/store.json` is lost when the
    - `GITHUB_TOKEN` = the token
 4. Restart. The admin page shows "GitHub gist sync: on"; every save is written to the gist, and a fresh deploy restores from it.
 
+The gist only holds the config; practice history stays on each device.
+
 ---
 
 ## The parent page (`/admin`)
@@ -106,7 +131,7 @@ Render's free plan has an **ephemeral disk**: `data/store.json` is lost when the
 | **Word lists** | Add / rename / duplicate / delete lists. Choose **A Latin**, **B Chinese** or **C Mixed passage**, set the **repeat count**, and type one item per line. |
 | **Practice** | App title and UI language, **which modes are allowed** (checkboxes), grids, **practice box size**, guide visibility, ink thickness/colour, pinyin / Wade-Giles / meaning / stroke numbers, sound, **read aloud**, pencil-only. |
 | **Scoring** | Tolerance (gentle / normal / strict), pass mark per stroke, coaching tips. |
-| **Backup** | Export / import JSON, reset to defaults, storage + gist status. |
+| **Backup** | Export / import JSON (settings **and** this device’s practice history), reset to defaults, database / gist status. |
 
 ### Stroke editor (`/strokes`)
 
@@ -169,6 +194,9 @@ The pure scoring code lives in `public/js/scoring.js` and has unit tests (`npm t
 server/
   index.js        Express app, API, admin auth
   store.js        Config load/save, validation, optional gist sync
+  db.js           Postgres storage (config + practice history)
+  progress.js     History validation and merging
+  progress-store.js  History read/write on top of the database
   hanzi.js        Stroke data fetch + disk/memory cache (hanzi-writer-data)
   wadegiles.js    Hanyu Pinyin → Wade-Giles conversion (tested)
   auth.js         PIN + signed cookie
@@ -190,7 +218,7 @@ public/
     ui.js         DOM helpers, icons, sheet, stars, confetti
     api.js        Fetch helpers
     settings.js   Per-device overrides
-    history.js    Local star history
+    history.js    Star history: localStorage cache + database sync
     sound.js      WebAudio feedback
   css/
   icons/          Generated app icons
@@ -203,6 +231,10 @@ test/scoring.test.js
 test/wadegiles.test.js
 test/units.test.js
 test/glyphs.test.js
+test/config.test.js
+test/progress.test.js
+test/db.test.js
+test/store-db.test.js
 render.yaml
 ```
 

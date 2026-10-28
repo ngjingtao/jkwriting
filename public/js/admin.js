@@ -8,6 +8,8 @@ const state = {
   selectedId: null,
   dirty: false,
   gist: false,
+  db: false,
+  storage: 'file',
   defaultPin: false,
 };
 let saveBar = null;
@@ -172,6 +174,8 @@ async function loadStatus() {
     if (!res.ok) return;
     const data = await res.json();
     state.gist = data.gist;
+    state.db = Boolean(data.db);
+    state.storage = data.storage || (data.db ? 'postgres' : 'file');
     state.defaultPin = data.defaultPin;
   } catch {
     /* ignore */
@@ -886,8 +890,15 @@ function dataTab() {
     {
       class: 'btn soft',
       onclick: () => {
-        const blob = new Blob([JSON.stringify(state.config, null, 2)], { type: 'application/json' });
-        const a = h('a', { href: URL.createObjectURL(blob), download: 'writing-fun-config.json' });
+        let history = [];
+        try {
+          history = JSON.parse(localStorage.getItem('wf.history.v1') || '[]');
+        } catch {
+          history = [];
+        }
+        const backup = { ...state.config, history: Array.isArray(history) ? history : [] };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
+        const a = h('a', { href: URL.createObjectURL(blob), download: 'writing-fun-backup.json' });
         document.body.append(a);
         a.click();
         a.remove();
@@ -908,7 +919,15 @@ function dataTab() {
       try {
         const data = JSON.parse(await file.text());
         if (!Array.isArray(data.sets)) throw new Error('no sets');
-        state.config = data;
+        if (Array.isArray(data.history)) {
+          try {
+            localStorage.setItem('wf.history.v1', JSON.stringify(data.history.slice(-500)));
+          } catch {
+            /* ignore quota */
+          }
+        }
+        const { history: _history, ...config } = data;
+        state.config = config;
         state.selectedId = data.sets[0]?.id || null;
         state.dirty = true;
         render();
@@ -931,7 +950,15 @@ function dataTab() {
     h(
       'div',
       { class: 'stat-line' },
-      h('span', { class: `pill ${state.gist ? 'ok' : ''}` }, state.gist ? 'GitHub gist sync: on' : 'Server disk storage'),
+      h(
+        'span',
+        { class: `pill ${state.db || state.gist ? 'ok' : ''}` },
+        state.db
+          ? 'Postgres database: on'
+          : state.gist
+            ? 'GitHub gist sync: on'
+            : 'Server disk storage',
+      ),
       state.defaultPin ? h('span', { class: 'pill warn' }, 'Default PIN in use') : null,
     ),
     h(
@@ -941,9 +968,11 @@ function dataTab() {
       h(
         'p',
         { style: { marginTop: '6px' } },
-        state.gist
-          ? 'Settings are saved to a private GitHub gist (GIST_ID + GITHUB_TOKEN), so they survive redeploys on Render’s free plan.'
-          : 'Settings are saved to data/store.json on the server. On Render’s free plan the disk is ephemeral, so use Export / Import (or set GIST_ID + GITHUB_TOKEN) to keep changes across redeploys.',
+        state.db
+          ? 'Word lists, settings, stroke edits and practice history are stored in the Postgres database (DATABASE_URL), so every device and every redeploy sees the same data.'
+          : state.gist
+            ? 'Settings are saved to a private GitHub gist (GIST_ID + GITHUB_TOKEN), so they survive redeploys on Render’s free plan. Practice history stays on each iPad.'
+            : 'Settings are saved to data/store.json on the server. On Render’s free plan the disk is ephemeral, so use Export / Import (or set DATABASE_URL / GIST_ID + GITHUB_TOKEN) to keep changes across redeploys.',
       ),
     ),
     h('div', { class: 'actions-row' }, exportBtn, importBtn, fileInput),

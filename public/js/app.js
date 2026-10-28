@@ -4,7 +4,7 @@ import { setStrokeOverrides } from './fontfit.js';
 import { h, icon, openSheet, switchRow, segmented, clear } from './ui.js';
 import { getSettings, getHomeLang, setHomeLang, setOverride, clearOverrides } from './settings.js';
 import { makeT } from './i18n.js';
-import { progressStats } from './history.js';
+import { progressStats, initHistorySync } from './history.js';
 import { setSound } from './sound.js';
 import { setSpeechEnabled } from './speech.js';
 
@@ -31,6 +31,10 @@ async function boot() {
   setSound(settings.sound);
   setSpeechEnabled(settings.speakOnComplete !== false);
   renderHome();
+  initHistorySync();
+  window.addEventListener('wf:progress', (event) => {
+    if (event.detail?.changed && state.lang === 'progress' && !state.practice) renderHome();
+  });
   registerServiceWorker();
 }
 
