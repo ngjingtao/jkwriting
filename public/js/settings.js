@@ -70,7 +70,7 @@ export function getSettings(config) {
 
 export function getHomeLang() {
   const stored = read(LANG_KEY, 'zh');
-  return ['zh', 'en', 'bm', 'passage'].includes(stored) ? stored : 'zh';
+  return ['zh', 'en', 'bm', 'passage', 'progress'].includes(stored) ? stored : 'zh';
 }
 
 export function setHomeLang(lang) {

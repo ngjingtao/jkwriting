@@ -1,17 +1,14 @@
 import { fetchConfig } from './api.js';
 import { Practice } from './practice.js';
-import { isMixed } from './units.js';
 import { h, icon, openSheet, switchRow, segmented, clear } from './ui.js';
 import { getSettings, getHomeLang, setHomeLang, setOverride, clearOverrides } from './settings.js';
 import { makeT } from './i18n.js';
-import { stats } from './history.js';
+import { progressStats } from './history.js';
 import { setSound } from './sound.js';
 import { setSpeechEnabled } from './speech.js';
 
 const app = document.getElementById('app');
 const state = { config: null, lang: getHomeLang(), practice: null };
-
-const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
 
 async function boot() {
   try {
@@ -39,8 +36,9 @@ function homeTabs(t) {
   return [
     { id: 'zh', label: '中文', glyph: '字' },
     { id: 'en', label: 'English', glyph: 'Aa' },
-    { id: 'bm', label: 'Bahasa Melayu', glyph: 'BM' },
+    { id: 'bm', label: 'BM', glyph: '' },
     { id: 'passage', label: t('lang.passage'), glyph: '¶' },
+    { id: 'progress', label: t('progress.title'), glyph: '★' },
   ];
 }
 
@@ -61,8 +59,8 @@ function renderHome() {
   const cfg = state.config;
   const settings = getSettings(cfg);
   const t = makeT(settings.uiLang);
-  const st = stats();
-  const sets = setsForTab(cfg);
+  const isProgress = state.lang === 'progress';
+  const sets = isProgress ? [] : setsForTab(cfg);
   document.title = cfg.app.title;
 
   clear(app);
@@ -82,70 +80,45 @@ function renderHome() {
             renderHome();
           },
         },
-        h('span', { class: 'glyph' }, tab.glyph),
+        h('span', { class: 'glyph' }, tab.glyph || ''),
         tab.label,
       ),
     );
   }
 
-  const grid = h('div', { class: 'set-grid' });
-  if (!sets.length) {
-    grid.append(h('div', { class: 'empty', style: { gridColumn: '1 / -1' } }, t('home.empty')));
-  }
-  for (const set of sets) {
-    const isPassage = set.kind === 'passage';
-    const sample = isPassage
-      ? `${set.items[0].text.slice(0, 56)}${set.items[0].text.length > 56 ? '…' : ''}`
-      : set.items.slice(0, 8).map((i) => i.text).join(' ');
-    const meta = [t('home.words', { n: set.items.length })];
-    if (set.repeat > 1) meta.push(`×${set.repeat}`);
-    grid.append(
-      h(
-        'button',
-        { class: `set-card${isPassage ? ' passage' : ''}`, onclick: () => openSet(set) },
-        h('span', { class: 's-go' }, icon('chevron')),
-        h(
-          'span',
-          { class: 's-name' },
-          set.name,
-          isPassage ? h('span', { class: 's-kind' }, t('lang.passage')) : null,
-        ),
-        h('span', { class: 's-sample' }, sample),
-        h('span', { class: 's-meta' }, meta.join(' · ')),
-      ),
-    );
-  }
-
-  const input = h('input', {
-    type: 'text',
-    placeholder: t('home.placeholder'),
-    'aria-label': t('home.free'),
-    autocapitalize: 'off',
-    autocomplete: 'off',
-    spellcheck: 'false',
-  });
-  const startFree = () => {
-    const text = input.value.trim();
-    if (!text) {
-      input.focus();
-      return;
+  let content;
+  if (isProgress) {
+    content = progressView(t);
+  } else {
+    const grid = h('div', { class: 'set-grid' });
+    if (!sets.length) {
+      grid.append(h('div', { class: 'empty', style: { gridColumn: '1 / -1' } }, t('home.empty')));
     }
-    const kind = isMixed(text) ? 'passage' : CJK.test(text) ? 'chinese' : 'latin';
-    const lang =
-      kind === 'chinese'
-        ? 'zh'
-        : kind === 'passage'
-          ? state.lang === 'bm'
-            ? 'bm'
-            : 'en'
-          : state.lang === 'bm'
-            ? 'bm'
-            : 'en';
-    startPractice({ text }, null, 0, lang, kind);
-  };
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') startFree();
-  });
+    for (const set of sets) {
+      const isPassage = set.kind === 'passage';
+      const sample = isPassage
+        ? `${set.items[0].text.slice(0, 56)}${set.items[0].text.length > 56 ? '…' : ''}`
+        : set.items.slice(0, 8).map((i) => i.text).join(' ');
+      const meta = [t('home.words', { n: set.items.length })];
+      if (set.repeat > 1) meta.push(`×${set.repeat}`);
+      grid.append(
+        h(
+          'button',
+          { class: `set-card${isPassage ? ' passage' : ''}`, onclick: () => openSet(set) },
+          h('span', { class: 's-go' }, icon('chevron')),
+          h(
+            'span',
+            { class: 's-name' },
+            set.name,
+            isPassage ? h('span', { class: 's-kind' }, t('lang.passage')) : null,
+          ),
+          h('span', { class: 's-sample' }, sample),
+          h('span', { class: 's-meta' }, meta.join(' · ')),
+        ),
+      );
+    }
+    content = h('section', {}, h('div', { class: 'section-label' }, t('home.sets')), grid);
+  }
 
   const home = h(
     'div',
@@ -170,23 +143,89 @@ function renderHome() {
         h('a', { class: 'ghost-link', href: '/admin' }, icon('lock'), t('home.parent')),
       ),
     ),
-    h('section', {}, h('div', { class: 'section-label' }, t('home.choose')), langTabs),
-    h('section', {}, h('div', { class: 'section-label' }, t('home.sets')), grid),
     h(
       'section',
       {},
-      h('div', { class: 'section-label' }, t('home.free')),
-      h('div', { class: 'free-row' }, input, h('button', { class: 'btn primary', onclick: startFree }, t('home.start'))),
+      h('div', { class: 'section-label' }, isProgress ? t('progress.title') : t('home.choose')),
+      langTabs,
     ),
-    h(
-      'div',
-      { class: 'stats' },
-      h('div', { class: 'stat' }, h('b', {}, String(st.todayStars)), h('span', {}, t('home.today'))),
-      h('div', { class: 'stat' }, h('b', {}, String(st.total)), h('span', {}, t('home.total'))),
-    ),
+    content,
   );
 
   app.append(home);
+}
+
+function statCard(iconName, value, label, tone) {
+  return h(
+    'div',
+    { class: `stat-card ${tone}` },
+    h('div', { class: 'stat-glyph' }, icon(iconName)),
+    h('div', { class: 'stat-value' }, String(value)),
+    h('div', { class: 'stat-label' }, label),
+  );
+}
+
+function progressView(t) {
+  const p = progressStats(7);
+  const wrap = h('div', { class: 'progress' });
+
+  wrap.append(
+    h(
+      'div',
+      { class: 'stat-hero' },
+      statCard('star', p.todayStars, t('progress.starsToday'), 'amber'),
+      statCard('pencil', p.total, t('progress.words'), 'indigo'),
+      statCard('sparkle', p.streak, t('progress.streak'), 'green'),
+    ),
+  );
+
+  const max = Math.max(1, ...p.days.map((d) => d.stars));
+  const chart = h('div', { class: 'chart', role: 'img', 'aria-label': t('progress.week') });
+  for (const day of p.days) {
+    chart.append(
+      h(
+        'div',
+        { class: `chart-col${day.today ? ' today' : ''}` },
+        h('div', { class: 'chart-value' }, day.stars ? String(day.stars) : ''),
+        h(
+          'div',
+          { class: 'chart-track' },
+          h('div', {
+            class: 'chart-bar',
+            style: { height: day.stars ? `${Math.max(10, Math.round((day.stars / max) * 100))}%` : '0%' },
+          }),
+        ),
+        h('div', { class: 'chart-label' }, day.today ? t('progress.today') : day.label),
+      ),
+    );
+  }
+  wrap.append(
+    h('div', { class: 'panel-card' }, h('h3', {}, t('progress.week')), chart),
+  );
+
+  if (p.recent.length) {
+    const list = h('div', { class: 'recent' });
+    for (const entry of p.recent) {
+      list.append(
+        h(
+          'div',
+          { class: 'recent-row' },
+          h('span', { class: 'recent-word' }, entry.text),
+          h('span', { class: 'recent-stars' }, '★'.repeat(entry.stars || 0)),
+          h(
+            'span',
+            { class: 'recent-date' },
+            new Date(entry.ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+          ),
+        ),
+      );
+    }
+    wrap.append(h('div', { class: 'panel-card' }, h('h3', {}, t('progress.recent')), list));
+  } else {
+    wrap.append(h('div', { class: 'empty' }, t('progress.empty')));
+  }
+
+  return wrap;
 }
 
 function openSet(set) {
