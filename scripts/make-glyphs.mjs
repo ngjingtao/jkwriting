@@ -49,6 +49,20 @@ function convert(ch) {
     strokes = [strokes[1], strokes[0], strokes[2]];
   }
 
+  // Teach straight segments as their own strokes instead of one continuous
+  // polyline (4 = diagonal + bar + stem, 5 = bar + stem + bowl, 7 = bar first).
+  if (ch === '4' && strokes.length === 2) {
+    const [top, corner, right] = strokes[0];
+    strokes = [[top, corner], [corner, right], strokes[1]];
+  }
+  if (ch === '5' && strokes.length === 1) {
+    const s = strokes[0];
+    strokes = [[s[0], s[1]], [s[1], s[2]], s.slice(2)];
+  }
+  if (ch === '7' && strokes.length === 2) {
+    strokes = [strokes[1], strokes[0]];
+  }
+
   const xs = strokes.flat().map((p) => p[0]);
   const minX = Math.min(...xs);
   const maxX = Math.max(...xs);

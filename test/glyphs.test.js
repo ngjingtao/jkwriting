@@ -34,6 +34,15 @@ test('E is taught as four strokes', () => {
   assert.equal(latinStrokes('E').length, 4);
 });
 
+test('digits with straight segments use separate strokes', () => {
+  assert.equal(latinStrokes('4').length, 3);
+  assert.equal(latinStrokes('5').length, 3);
+  assert.equal(latinStrokes('7').length, 2);
+  for (const ch of ['4', '5']) {
+    for (const stroke of latinStrokes(ch).slice(0, 2)) assert.equal(stroke.length, 2);
+  }
+});
+
 test('T starts with the top bar', () => {
   const [bar, stem] = latinStrokes('T');
   assert.equal(bar.length, 2);

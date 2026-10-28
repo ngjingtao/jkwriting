@@ -116,22 +116,28 @@ function smooth(points, passes = 2) {
   return result;
 }
 
-function snapStroke(stroke, skeleton) {
-  const snapped = [];
-  for (const [x, y] of stroke) {
-    let best = null;
-    let bestDistance = 0.07 * 0.07;
-    for (const [sx, sy] of skeleton) {
-      const dx = sx - x;
-      const dy = sy - y;
-      const distance = dx * dx + dy * dy;
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        best = [sx, sy];
-      }
+function snapPoint(point, skeleton) {
+  let best = null;
+  let bestDistance = 0.07 * 0.07;
+  for (const [sx, sy] of skeleton) {
+    const dx = sx - point[0];
+    const dy = sy - point[1];
+    const distance = dx * dx + dy * dy;
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      best = [sx, sy];
     }
-    snapped.push(best || [x, y]);
   }
+  return best || point;
+}
+
+function snapStroke(stroke, skeleton) {
+  // Straight strokes stay perfectly straight: snap only the endpoints.
+  if (stroke.length === 2) {
+    return [snapPoint(stroke[0], skeleton), snapPoint(stroke[1], skeleton)];
+  }
+
+  const snapped = stroke.map((point) => snapPoint(point, skeleton));
 
   const unique = [];
   for (const point of snapped) {
@@ -141,6 +147,83 @@ function snapStroke(stroke, skeleton) {
   if (!unique.length) return snapped;
   if (unique.length === 1) return [unique[0], unique[0]];
   return smooth(resample(unique, 20));
+}
+
+/** Give strokes that meet at a corner the same fitted point. */
+function reconcileEndpoints(raw, fitted) {
+  const endpoints = [];
+  raw.forEach((stroke, si) => {
+    endpoints.push({ si, at: 0, raw: stroke[0], fit: fitted[si][0] });
+    endpoints.push({
+      si,
+      at: fitted[si].length - 1,
+      raw: stroke[stroke.length - 1],
+      fit: fitted[si][fitted[si].length - 1],
+    });
+  });
+
+  const used = new Set();
+  for (let i = 0; i < endpoints.length; i += 1) {
+    if (used.has(i)) continue;
+    const group = [i];
+    for (let j = i + 1; j < endpoints.length; j += 1) {
+      if (used.has(j)) continue;
+      const dx = endpoints[i].raw[0] - endpoints[j].raw[0];
+      const dy = endpoints[i].raw[1] - endpoints[j].raw[1];
+      if (Math.hypot(dx, dy) < 0.004) group.push(j);
+    }
+    if (group.length < 2) continue;
+    let x = 0;
+    let y = 0;
+    for (const index of group) {
+      x += endpoints[index].fit[0];
+      y += endpoints[index].fit[1];
+      used.add(index);
+    }
+    const point = [x / group.length, y / group.length];
+    for (const index of group) {
+      const endpoint = endpoints[index];
+      fitted[endpoint.si][endpoint.at] = point;
+    }
+  }
+}
+
+/** Keep horizontal bars horizontal and vertical stems vertical. */
+function enforceAxes(raw, fitted) {
+  raw.forEach((stroke, index) => {
+    if (stroke.length !== 2 || fitted[index].length !== 2) return;
+    const dx = Math.abs(stroke[1][0] - stroke[0][0]);
+    const dy = Math.abs(stroke[1][1] - stroke[0][1]);
+    const [a, b] = fitted[index];
+    if (dy < 0.012 && dx > 0.03) {
+      const y = (a[1] + b[1]) / 2;
+      fitted[index] = [
+        [a[0], y],
+        [b[0], y],
+      ];
+    } else if (dx < 0.012 && dy > 0.03) {
+      const x = (a[0] + b[0]) / 2;
+      fitted[index] = [
+        [x, a[1]],
+        [x, b[1]],
+      ];
+    }
+  });
+}
+
+/** Join the split corners of 4 and 7 exactly. */
+function joinCorners(ch, fitted) {
+  if (ch === '4' && fitted.length === 3 && fitted[1].length === 2) {
+    const [diagonal, bar] = fitted;
+    const y = bar[1][1];
+    bar[0] = [bar[0][0], y];
+    bar[1] = [bar[1][0], y];
+    diagonal[diagonal.length - 1] = [bar[0][0], y];
+  }
+  if (ch === '7' && fitted.length === 2 && fitted[0].length === 2) {
+    const [bar, diagonal] = fitted;
+    diagonal[0] = [bar[1][0], bar[1][1]];
+  }
 }
 
 function fit(ch) {
@@ -158,7 +241,11 @@ function fit(ch) {
     skeleton = [];
   }
   if (skeleton.length < 12) return aligned;
-  return aligned.map((stroke) => snapStroke(stroke, skeleton));
+  const fitted = aligned.map((stroke) => snapStroke(stroke, skeleton));
+  reconcileEndpoints(aligned, fitted);
+  enforceAxes(aligned, fitted);
+  joinCorners(ch, fitted);
+  return fitted;
 }
 
 /** Stroke medians for a Latin character, matched to the Didact glyph. */
