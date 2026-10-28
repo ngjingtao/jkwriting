@@ -53,7 +53,8 @@ function cleanStrokes(raw) {
     if (!/^[A-Za-z0-9]$/.test(ch) || !Array.isArray(value)) continue;
     const strokes = [];
     for (const stroke of value.slice(0, 8)) {
-      if (!Array.isArray(stroke) || stroke.length < 2 || stroke.length > 80) continue;
+      // A one-point stroke is a dot (used for the dots on i and j).
+      if (!Array.isArray(stroke) || stroke.length < 1 || stroke.length > 80) continue;
       const points = [];
       for (const point of stroke) {
         if (!Array.isArray(point) || point.length < 2) continue;
@@ -62,7 +63,7 @@ function cleanStrokes(raw) {
         if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
         points.push([Math.min(1, Math.max(0, x)), Math.min(1, Math.max(0, y))]);
       }
-      if (points.length >= 2) strokes.push(points);
+      if (points.length >= 1) strokes.push(points);
     }
     if (strokes.length) out[ch] = strokes;
   }
@@ -133,7 +134,16 @@ export function sanitizeConfig(raw) {
   if (!allowedModes.includes(mode)) mode = allowedModes[0];
 
   const strokes = cleanStrokes(src.strokes);
-  const seeded = Number(src.version) >= CONFIG_VERSION ? strokes : { ...base.strokes, ...strokes };
+  const seeded =
+    Number(src.version) >= CONFIG_VERSION ? strokes : { ...base.strokes, ...strokes };
+
+  // v4: the dots on i and j became single-point dot strokes. Older stores
+  // kept them as tiny loops, so take the shipped shape once.
+  if (Number(src.version) < 4) {
+    for (const ch of ['i', 'j']) {
+      if (base.strokes[ch]) seeded[ch] = base.strokes[ch];
+    }
+  }
 
   return {
     version: CONFIG_VERSION,

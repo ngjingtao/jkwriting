@@ -145,6 +145,7 @@ Open **Stroke editor** from the parent page header (it uses the same PIN session
 - **Drag any point**; **double-click a line** to insert a point.
 - Select a point and use **Split here** to break a stroke in two.
 - **+ Stroke**, **− Point**, **⇄** (reverse), **↑ ↓** (order) change the structure.
+- **● Dot** turns the selected stroke into a dot (one point, e.g. the dots on **i** and **j**). Press it again to turn the dot back into a short line; tapping near it is what scores.
 - **Use auto fit** restores the generated guide; **Undo** and arrow-key nudging help fine-tuning.
 - **Save strokes** stores the override in `config.strokes` on the server (included in Backup/Gist).
 - The practice app uses the same override for the visible guide **and** the scoring — reload the app after saving.

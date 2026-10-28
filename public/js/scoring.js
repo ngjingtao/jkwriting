@@ -82,11 +82,51 @@ const chord = (pts) => {
   return len < 1e-6 ? [0, 0, 0] : [(b[0] - a[0]) / len, (b[1] - a[1]) / len, len];
 };
 
+/** A dot target: a single point, or a stroke so short it is a tap. */
+export function isDotStroke(stroke) {
+  if (!Array.isArray(stroke) || !stroke.length) return false;
+  return stroke.length === 1 || pathLength(stroke) < 0.02;
+}
+
+/** Score a tap against a dot: near the point, and small enough to be a dot. */
+function compareDotStroke(user, ref, tolerance = 1) {
+  const [dx, dy] = ref[0];
+  const n = user.length || 1;
+  let cx = 0;
+  let cy = 0;
+  for (const p of user) {
+    cx += p[0];
+    cy += p[1];
+  }
+  cx /= n;
+  cy /= n;
+  let spread = 0;
+  for (const p of user) spread = Math.max(spread, Math.hypot(p[0] - cx, p[1] - cy));
+  const d = Math.hypot(cx - dx, cy - dy);
+  const abs = 1 / (1 + (d / (0.06 * tolerance)) ** 1.5);
+  const compact = spread <= 0.07 ? 1 : Math.max(0.2, 1 - (spread - 0.07) / 0.16);
+  const score = clamp01(abs * (0.7 + 0.3 * compact));
+  return {
+    score,
+    abs,
+    shape: compact,
+    start: abs,
+    end: abs,
+    dir: 1,
+    reversed: false,
+    lenRatio: 1,
+    dMean: d,
+    dot: true,
+  };
+}
+
 /**
  * Compare one user stroke with one reference stroke.
  * All coordinates are normalised to the practice square (0..1).
  */
 export function compareStroke(user, ref, tolerance = 1) {
+  if (isDotStroke(ref)) return compareDotStroke(user, ref, tolerance);
+
   const B = resample(ref, 32);
   const A = resample(user, 32);
   if (!A.length || !B.length) {
@@ -145,6 +185,10 @@ export function compareStroke(user, ref, tolerance = 1) {
 /** Human-readable problem keys for a stroke comparison, most important first. */
 export function strokeIssues(cmp) {
   const issues = [];
+  if (cmp.dot) {
+    if (cmp.abs < 0.5) issues.push('position');
+    return issues;
+  }
   if (cmp.reversed) issues.push('reversed');
   if (cmp.start < 0.42) issues.push('start');
   if (cmp.dir < 0.45) issues.push('direction');

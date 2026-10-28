@@ -509,6 +509,11 @@ export class WritingSurface {
     ctx.quadraticCurveTo(prev[0], prev[1], last[0], last[1]);
   }
 
+  /** Radius used for a dot stroke: the child's brush, with a small floor. */
+  _dotRadius() {
+    return Math.max(this.box.size * this.opts.inkWidth * 0.5, this.box.size * 0.019);
+  }
+
   _strokePolyline(ctx, points, width, color, alpha = 1) {
     if (!points.length) return;
     ctx.save();
@@ -604,6 +609,36 @@ export class WritingSurface {
 
     const pts = stroke.median;
     const color = flashing ? RED : ACCENT;
+
+    if (pts.length === 1) {
+      // A dot: pulse a halo around the tap point instead of drawing a line.
+      const [x, y] = this._toPx(pts[0]);
+      const r = this._dotRadius();
+      ctx.save();
+      ctx.globalAlpha = 0.16 + 0.1 * pulse;
+      ctx.beginPath();
+      ctx.arc(x, y, r * (1.75 + 0.18 * pulse), 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.globalAlpha = 0.95;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.lineWidth = Math.max(2, size * 0.006);
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+      if (this.opts.showNumbers) {
+        ctx.fillStyle = '#fff';
+        ctx.font = `700 ${Math.round(r * 0.95)}px ${this._font}`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(this.hintIndex + 1), x, y + size * 0.001);
+      }
+      ctx.restore();
+      return;
+    }
 
     ctx.save();
     ctx.setLineDash([size * 0.018, size * 0.022]);
@@ -733,13 +768,14 @@ export class WritingSurface {
     for (const idx of this.result.missing) {
       const s = this.unit.strokes[idx];
       const filled = this._fillHanzi(ctx, s, RED, 0.12);
+      const dot = s.median.length === 1;
       if (!filled) {
         this._strokePolyline(
           ctx,
           s.median,
-          this.box.size * this.opts.inkWidth * (this._isLatin ? 0.55 : 0.9),
+          dot ? this._dotRadius() * 2 : this.box.size * this.opts.inkWidth * (this._isLatin ? 0.55 : 0.9),
           RED,
-          0.16,
+          dot ? 0.45 : 0.16,
         );
       }
       ctx.save();
@@ -763,9 +799,19 @@ export class WritingSurface {
       const p = Math.min(1, elapsed / anim.duration);
       const partial = partialPoints(stroke.median, p);
       const mul = this._isLatin ? 0.4 : 1;
+      const dot = stroke.median.length === 1;
+      const width = dot ? this._dotRadius() * 2 : size * this.opts.inkWidth * 0.95 * mul;
       const filled = this._fillHanzi(ctx, stroke, ACCENT, 0.16);
-      if (!filled) this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 1.05 * mul, ACCENT, 0.16);
-      this._strokePolyline(ctx, partial, size * this.opts.inkWidth * 0.95 * mul, ACCENT, 0.95);
+      if (!filled) {
+        this._strokePolyline(
+          ctx,
+          stroke.median,
+          dot ? this._dotRadius() * 2 : size * this.opts.inkWidth * 1.05 * mul,
+          ACCENT,
+          dot ? 0.3 : 0.16,
+        );
+      }
+      this._strokePolyline(ctx, partial, width, ACCENT, 0.95);
       this._drawBrush(ctx, partial);
       if (p >= 1) this._finishAnim();
       return;
@@ -776,18 +822,20 @@ export class WritingSurface {
       for (let i = 0; i < this.unit.strokes.length; i += 1) {
         const win = anim.windows[i];
         const stroke = this.unit.strokes[i];
+        const dot = stroke.median.length === 1;
+        const baseWidth = dot ? this._dotRadius() * 2 : size * this.opts.inkWidth;
         if (elapsed >= win.end) {
           const filled = this._fillHanzi(ctx, stroke, ACCENT, 0.2);
-          if (!filled) this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * mul, ACCENT, 0.2);
-          this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 0.9 * mul, ACCENT, 0.95);
+          if (!filled) this._strokePolyline(ctx, stroke.median, baseWidth * mul, ACCENT, dot ? 0.4 : 0.2);
+          this._strokePolyline(ctx, stroke.median, dot ? baseWidth : baseWidth * 0.9 * mul, ACCENT, 0.95);
         } else if (elapsed >= win.start) {
           const p = (elapsed - win.start) / (win.end - win.start);
           const partial = partialPoints(stroke.median, p);
           const filled = this._fillHanzi(ctx, stroke, ACCENT, 0.05);
           if (!filled) {
-            this._strokePolyline(ctx, stroke.median, size * this.opts.inkWidth * 1.05 * mul, ACCENT, 0.08);
+            this._strokePolyline(ctx, stroke.median, dot ? baseWidth : baseWidth * 1.05 * mul, ACCENT, dot ? 0.18 : 0.08);
           }
-          this._strokePolyline(ctx, partial, size * this.opts.inkWidth * 0.95 * mul, ACCENT, 0.95);
+          this._strokePolyline(ctx, partial, dot ? baseWidth : baseWidth * 0.95 * mul, ACCENT, 0.95);
           this._drawBrush(ctx, partial);
           // number badge
           const [bx, by] = this._toPx(stroke.median[0]);

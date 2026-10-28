@@ -6,7 +6,7 @@ import { STROKE_OVERRIDES } from './stroke-seed.js';
 // Bump CONFIG_VERSION when the shipped defaults must reach existing stores once.
 // Stores written before this version get the stroke seed merged in; after that,
 // deleting an override in /strokes sticks.
-export const CONFIG_VERSION = 3;
+export const CONFIG_VERSION = 4;
 
 export const DEFAULT_CONFIG = {
   version: CONFIG_VERSION,

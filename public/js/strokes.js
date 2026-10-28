@@ -239,7 +239,11 @@ function renderStrokePanel() {
           onclick: () => selectStroke(index),
         },
         h('span', { class: 'swatch', style: { background: COLORS[index % COLORS.length] } }),
-        h('span', { class: 's-label' }, `Stroke ${index + 1} · ${stroke.length} pts`),
+        h(
+          'span',
+          { class: 's-label' },
+          `Stroke ${index + 1} · ${stroke.length === 1 ? 'dot' : `${stroke.length} pts`}`,
+        ),
         h(
           'button',
           {
@@ -299,6 +303,7 @@ function renderStrokePanel() {
   const tools = h('div', { class: 'tool-grid' });
   tools.append(
     h('button', { class: 'btn sm', onclick: addStroke }, '+ Stroke'),
+    h('button', { class: 'btn sm', onclick: addDot }, '● Dot'),
     h('button', { class: 'btn sm', onclick: addPoint }, '+ Point'),
     h('button', { class: 'btn sm', onclick: deletePoint }, '− Point'),
     h('button', { class: 'btn sm', onclick: splitStroke }, 'Split here'),
@@ -314,7 +319,9 @@ function renderStrokePanel() {
       { class: 'point-info' },
       p
         ? `Point ${state.point + 1}: x ${p[0].toFixed(3)}, y ${p[1].toFixed(3)} · arrow keys nudge · Delete removes`
-        : 'Select a point to edit. Double-click a line to insert one.',
+        : state.strokes[state.selected]?.length === 1
+          ? 'Dot stroke: drag its single point, or press “● Dot” to turn it back into a line.'
+          : 'Select a point to edit. Double-click a line to insert one.',
     ),
   );
 }
@@ -437,6 +444,28 @@ function drawStroke(ctx, stroke, index, ox, oy, size) {
   const color = COLORS[index % COLORS.length];
   const active = index === state.selected;
   ctx.save();
+
+  if (stroke.length === 1) {
+    const [u, v] = stroke[0];
+    const x = ox + u * size;
+    const y = oy + v * size;
+    const r = size * 0.026;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = Math.max(2, size * 0.005);
+    ctx.strokeStyle = active ? '#4f46e5' : '#fff';
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.font = `700 ${Math.round(size * 0.024)}px ${getComputedStyle(document.body).fontFamily}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(String(index + 1), x, y + size * 0.001);
+    ctx.restore();
+    return;
+  }
+
   ctx.strokeStyle = color;
   ctx.lineWidth = active ? size * 0.009 : size * 0.006;
   ctx.lineCap = 'round';
@@ -696,9 +725,43 @@ function addStroke() {
   draw();
 }
 
+function addDot() {
+  const stroke = state.strokes[state.selected];
+  if (!stroke) {
+    toast('Select or add a stroke first');
+    return;
+  }
+  pushUndo();
+  if (stroke.length === 1) {
+    // Turn the dot back into a short horizontal stroke.
+    const [u, v] = stroke[0];
+    state.strokes[state.selected] = [
+      [clamp01(u - 0.05), v],
+      [clamp01(u + 0.05), v],
+    ];
+    state.point = -1;
+  } else {
+    let x = 0;
+    let y = 0;
+    for (const [u, v] of stroke) {
+      x += u;
+      y += v;
+    }
+    state.strokes[state.selected] = [[clamp01(x / stroke.length), clamp01(y / stroke.length)]];
+    state.point = 0;
+  }
+  state.dirty = true;
+  renderPanels();
+  draw();
+}
+
 function addPoint() {
   const stroke = state.strokes[state.selected];
   if (!stroke) return;
+  if (stroke.length === 1) {
+    toast('A dot has one point — press “● Dot” first to make it a line');
+    return;
+  }
   pushUndo();
   const index = state.point;
   if (index >= 0 && index < stroke.length - 1) {
@@ -725,6 +788,10 @@ function deletePoint() {
     toast('Select a point first');
     return;
   }
+  if (stroke.length === 1) {
+    toast('A dot has one point — delete the whole stroke instead');
+    return;
+  }
   if (stroke.length <= 2) {
     toast('A stroke needs at least two points');
     return;
@@ -739,7 +806,7 @@ function deletePoint() {
 
 function splitStroke() {
   const stroke = state.strokes[state.selected];
-  if (!stroke || state.point <= 0 || state.point >= stroke.length - 1) {
+  if (!stroke || stroke.length < 3 || state.point <= 0 || state.point >= stroke.length - 1) {
     toast('Select a middle point to split there');
     return;
   }
