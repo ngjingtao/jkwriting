@@ -529,7 +529,7 @@ export class WritingSurface {
     if (!this.unit) return;
     const alpha = this.opts.guideOpacity;
     if (this.unit.script === 'latin') {
-      this._drawLatinText(ctx, this.unit.char, GHOST, Math.min(0.45, alpha * 1.4));
+      this._drawLatinText(ctx, this.unit.char, GHOST, Math.min(0.65, alpha * 2.4));
       return;
     }
     for (const s of this.unit.strokes) {

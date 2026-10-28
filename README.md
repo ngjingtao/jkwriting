@@ -121,6 +121,7 @@ Render's free plan has an **ephemeral disk**: `data/store.json` is lost when the
 
 - Uses the iPad's built-in `speechSynthesis` voices: Mandarin for Chinese, English or Malay for Latin text.
 - If the iPad has no Malay voice, the app falls back to Indonesian, then English.
+- **If the iPad has no Mandarin voice**, iOS would read a Chinese character as “Chinese letter”. The app detects that and reads the **Hanyu Pinyin** instead. For the real pronunciation, install a Mandarin voice in **Settings → Accessibility → Spoken Content → Voices → Chinese**.
 - The first speech happens after a tap, which satisfies iOS's audio rules. There is a speaker button in the practice header to repeat it.
 - Turn it off globally in **Practice → Read aloud**, or per device in the settings sheet.
 

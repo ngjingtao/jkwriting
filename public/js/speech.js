@@ -11,6 +11,7 @@ const VOICE_LANG = { zh: 'zh-CN', en: 'en-US', bm: 'ms-MY' };
 
 let voices = [];
 let primed = false;
+let voicesReady = null;
 
 function refresh() {
   if (!supported) return;
@@ -30,16 +31,53 @@ if (supported) {
   }
 }
 
+/** Wait briefly for the voice list; Safari populates it asynchronously. */
+function whenVoices(timeout = 700) {
+  if (!supported) return Promise.resolve();
+  if (voices.length) return Promise.resolve();
+  if (voicesReady) return voicesReady;
+  refresh();
+  if (voices.length) return Promise.resolve();
+
+  voicesReady = new Promise((resolve) => {
+    let settled = false;
+    const onChanged = () => {
+      if (voices.length) finish();
+    };
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      refresh();
+      try {
+        window.speechSynthesis.removeEventListener('voiceschanged', onChanged);
+      } catch {
+        /* ignore */
+      }
+      resolve();
+    };
+    try {
+      window.speechSynthesis.addEventListener('voiceschanged', onChanged);
+    } catch {
+      /* ignore */
+    }
+    setTimeout(finish, timeout);
+  }).finally(() => {
+    voicesReady = null;
+  });
+  return voicesReady;
+}
+
+const normalise = (s) => String(s || '').replace('_', '-').toLowerCase();
+
 function pickVoice(lang) {
   if (!supported) return null;
   if (!voices.length) refresh();
-  const norm = (s) => String(s || '').replace('_', '-').toLowerCase();
   for (const code of FALLBACKS[lang] || [lang]) {
-    const wanted = norm(code);
-    const exact = voices.find((v) => norm(v.lang) === wanted);
+    const wanted = normalise(code);
+    const exact = voices.find((v) => normalise(v.lang) === wanted);
     if (exact) return exact;
     const base = wanted.split('-')[0];
-    const loose = voices.find((v) => norm(v.lang).split('-')[0] === base);
+    const loose = voices.find((v) => normalise(v.lang).split('-')[0] === base);
     if (loose) return loose;
   }
   return null;
@@ -51,6 +89,13 @@ export function voiceLang(lang) {
 
 export function speechSupported() {
   return supported;
+}
+
+/** True when the device actually has a Chinese voice installed. */
+export function chineseVoiceAvailable() {
+  if (!supported) return false;
+  refresh();
+  return voices.some((voice) => /^zh/i.test(normalise(voice.lang)));
 }
 
 export function setSpeechEnabled(on) {
@@ -100,18 +145,47 @@ function splitByScript(text) {
   return runs;
 }
 
-/** Speak a word or a mixed sentence. Chinese runs use a Mandarin voice. */
-export function speak(text, lang = 'en-US') {
+const withoutTones = (text) =>
+  String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ü/g, 'u')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+/**
+ * Speak a word or a mixed sentence.
+ * `fallback` is the Hanyu Pinyin used when the device has no Chinese voice —
+ * iOS otherwise reads a CJK character as "Chinese letter".
+ */
+export async function speak(text, lang = 'en-US', fallback = '') {
   if (!supported) return;
   const clean = String(text || '').replace(/\s+/g, ' ').trim();
   if (!clean) return;
+
+  await whenVoices();
+
+  const latinLang = FALLBACKS[lang] ? lang : VOICE_LANG[lang] || 'en-US';
+  const chineseVoice = pickVoice('zh-CN');
+  const allChinese = !/[A-Za-z]/.test(clean);
+  const pinyin = withoutTones(fallback);
+
   stopSpeech();
-  const latinVoice = FALLBACKS[lang] ? lang : VOICE_LANG[lang] || 'en-US';
   for (const run of splitByScript(clean)) {
-    const runLang = run.zh ? 'zh-CN' : latinVoice;
-    const utter = new SpeechSynthesisUtterance(run.text.trim());
+    let runLang = run.zh ? 'zh-CN' : latinLang;
+    let spoken = run.text.trim();
+    let voice = run.zh ? chineseVoice : pickVoice(runLang);
+
+    if (run.zh && !voice) {
+      if (!allChinese || !pinyin) continue; // never say "Chinese letter"
+      spoken = pinyin;
+      runLang = 'en-US';
+      voice = pickVoice('en-US');
+    }
+    if (!spoken) continue;
+
+    const utter = new SpeechSynthesisUtterance(spoken);
     utter.lang = runLang;
-    const voice = pickVoice(runLang);
     if (voice) utter.voice = voice;
     utter.rate = 0.82;
     utter.pitch = 1.02;

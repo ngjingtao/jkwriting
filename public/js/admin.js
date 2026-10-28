@@ -801,7 +801,7 @@ function practiceTab() {
     }),
     switchRow(
       'Read aloud',
-      'Speak the word automatically when it is finished (Hanyu Pinyin / English / Malay voice).',
+      'Speak the word when it is finished. Chinese needs a Mandarin voice (iPad Settings → Accessibility → Spoken Content); otherwise the Hanyu Pinyin is read instead.',
       p.speakOnComplete,
       (v) => {
         p.speakOnComplete = v;

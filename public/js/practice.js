@@ -512,7 +512,7 @@ export class Practice {
     this.completed.push(summary);
     this.surface.stopAnimation();
     if (this.settings.speakOnComplete !== false) {
-      speak(summary.text, voiceLang(summary.lang));
+      speak(summary.text, voiceLang(summary.lang), summary.pinyin);
     }
 
     if (this.tokenIndex < this.tokens.length - 1) {
@@ -531,7 +531,7 @@ export class Practice {
   _speakCurrent() {
     const token = this.tokens[this.tokenIndex];
     if (!token) return;
-    speak(token.text, voiceLang(token.lang));
+    speak(token.text, voiceLang(token.lang), this.pinyin);
   }
 
   /* ------------------------------- toolbar -------------------------------- */
