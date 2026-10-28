@@ -529,7 +529,7 @@ export class WritingSurface {
     if (!this.unit) return;
     const alpha = this.opts.guideOpacity;
     if (this.unit.script === 'latin') {
-      this._drawLatinText(ctx, this.unit.char, GHOST, Math.min(0.65, alpha * 2.4));
+      this._drawLatinText(ctx, this.unit.char, GHOST, Math.min(0.6, alpha * 2.2));
       return;
     }
     for (const s of this.unit.strokes) {
@@ -543,13 +543,20 @@ export class WritingSurface {
   _drawLatinText(ctx, text, color, alpha) {
     const size = this.box.size;
     const fontSize = size * LATIN_SIZE_RATIO;
+    const x = this.box.x + size / 2;
+    const y = this.box.y + size * LATIN_BASELINE;
     ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.fillStyle = color;
     ctx.font = `400 ${fontSize}px ${this._latinFamily}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'alphabetic';
-    ctx.fillText(text || '', this.box.x + size / 2, this.box.y + size * LATIN_BASELINE);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = color;
+    ctx.fillText(text || '', x, y);
+    // A slightly stronger outline keeps the model legible on bright screens.
+    ctx.globalAlpha = Math.min(0.85, alpha + 0.18);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = Math.max(1, size * 0.0022);
+    ctx.strokeText(text || '', x, y);
     ctx.restore();
   }
 
