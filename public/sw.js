@@ -1,6 +1,6 @@
 /* Offline shell for the iPad home-screen app.
    Bump VERSION when you deploy changed app files. */
-const VERSION = 'writing-fun-v16';
+const VERSION = 'writing-fun-v17';
 const SHELL = [
   '/',
   '/index.html',
