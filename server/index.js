@@ -185,4 +185,13 @@ app.listen(PORT, () => {
   if (usingDefaultPin) {
     console.warn('[auth] ADMIN_PIN not set — using default PIN "2468". Set ADMIN_PIN on Render!');
   }
+  // Warm the storage layer so /api/health reports the real backend and a
+  // first run seeds the database (or the file) before anyone opens the app.
+  loadConfig()
+    .then(() => {
+      console.log(
+        syncState.db ? '[db] connected — Postgres storage active' : '[store] using data/store.json',
+      );
+    })
+    .catch((err) => console.warn('[startup] config load failed:', err.message));
 });

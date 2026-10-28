@@ -104,6 +104,8 @@ That means the same data follows you across machines, redeploys and a fresh Rend
 Notes:
 
 - Tables are created automatically; no migration step.
+- **Neon**: paste the pooled connection string. The server resolves the IPv4 address itself (some networks advertise IPv6 without routing it) and keeps the hostname as the TLS server name for the pooler, so `sslmode=require` works; `channel_binding` is ignored by node-postgres.
+- Put the same `DATABASE_URL` in a local `.env` to share one database between your laptop, the iPads and Render — every save, stroke edit and practice record lands in the same place.
 - Managed providers need SSL — it is enabled automatically for non-local hosts. For an unusual setup set `PGSSL=off` (no SSL) or `PGSSL=require` (strict verification).
 - The free tier of Render Postgres expires after 30 days; Neon/Supabase free tiers are fine for a family.
 - Practice history is merged, not overwritten: two iPads can practice offline and both sets of words appear after they sync (debounced push on new words, pull on boot and every minute).

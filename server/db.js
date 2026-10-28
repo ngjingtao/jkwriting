@@ -5,6 +5,8 @@
 // Set DATABASE_URL (Render/Neon/Supabase/Railway all work) to enable it.
 // Without it the app keeps using data/store.json and localStorage only.
 
+import dns from 'node:dns/promises';
+
 const CONFIG_ID = 1;
 const PROGRESS_LIMIT = 800;
 
@@ -37,12 +39,38 @@ function sslFor(connectionString) {
 async function createClient() {
   const { default: pg } = await import('pg');
   const connectionString = process.env.DATABASE_URL;
+  const url = new URL(connectionString);
+  const hostname = url.hostname;
+  const mode = (url.searchParams.get('sslmode') || '').toLowerCase();
+  let ssl = sslFor(connectionString);
+  if (mode === 'disable') ssl = false;
+
+  // Some home/office networks advertise IPv6 but cannot route it, and then
+  // node-postgres hangs until the timeout. Resolve the IPv4 address up front
+  // and keep the hostname as the TLS server name (managed poolers route by
+  // SNI, so this keeps the certificate/proxy happy).
+  let host = hostname;
+  if (ssl) {
+    const address = await dns
+      .lookup(hostname, { family: 4 })
+      .then((found) => found.address)
+      .catch(() => null);
+    if (address) {
+      host = address;
+      ssl = { ...(typeof ssl === 'object' ? ssl : {}), servername: hostname };
+    }
+  }
+
   pool = new pg.Pool({
-    connectionString,
-    ssl: sslFor(connectionString),
+    host,
+    port: Number(url.port) || 5432,
+    user: decodeURIComponent(url.username),
+    password: decodeURIComponent(url.password),
+    database: decodeURIComponent(url.pathname.replace(/^\//, '')) || undefined,
+    ssl,
     max: Number(process.env.PGPOOL_MAX) || 4,
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 12000,
+    connectionTimeoutMillis: 15000,
   });
   pool.on('error', (err) => {
     dbState.lastError = err.message;
