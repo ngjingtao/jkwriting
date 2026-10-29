@@ -1470,3 +1470,71 @@ p {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------ student chip ------------------------------ */
+
+.student-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 750;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.student-chip svg {
+  width: 18px;
+  height: 18px;
+  color: var(--brand);
+}
+
+.student-chip:active {
+  background: #f7f3ec;
+}
+
+.student-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.student-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.student-option svg {
+  width: 20px;
+  height: 20px;
+  color: var(--muted);
+}
+
+.student-option.active {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+}
+
+.student-option .so-check {
+  margin-left: auto;
+  color: var(--brand);
+  font-weight: 800;
+}

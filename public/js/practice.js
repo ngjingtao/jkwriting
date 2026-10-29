@@ -15,6 +15,8 @@ import { makeT } from './i18n.js';
 import { sfx, setSound, unlockAudio } from './sound.js';
 import { speak, primeSpeech, setSpeechEnabled, voiceLang } from './speech.js';
 import { addEntry } from './history.js';
+import { currentStudentId } from './students.js';
+import { queueWork } from './work.js';
 import { setOverride, clearOverrides } from './settings.js';
 
 const MODES = ['trace', 'copy', 'memory'];
@@ -455,8 +457,30 @@ export class Practice {
     this.results[this.index] = result;
     this.surface.setHint(-1);
     this.surface.applyResult(result);
+    this._captureWork(result);
     sfx.done();
     this._advance();
+  }
+
+  /** Keep the handwriting and score for the review / print pages. */
+  _captureWork(result) {
+    const unit = this.units[this.index];
+    if (!unit || !result) return;
+    const strokes = this.surface?.getInkStrokes?.() || [];
+    if (!strokes.length) return;
+    queueWork({
+      student: currentStudentId(),
+      ts: Date.now(),
+      token: this.item?.text || unit.char,
+      unit: unit.char,
+      setName: this.setName || '',
+      lang: this.lang,
+      kind: this.kind,
+      pct: result.pct,
+      stars: result.stars,
+      strokes,
+      guide: unit.strokes.map((s) => s.median),
+    });
   }
 
   _checkFree() {
@@ -473,6 +497,7 @@ export class Practice {
     this.surface.applyResult(result);
     this.state.done = true;
     this.results[this.index] = result;
+    this._captureWork(result);
     sfx.done();
     this._flashBadge(result);
     if (this.index < this.units.length - 1) {

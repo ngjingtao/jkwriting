@@ -130,6 +130,23 @@ The gist only holds the config; practice history stays on each device.
 
 ---
 
+## Students (multiple children, one library)
+
+The word lists, settings and stroke guides are **shared**; each child keeps their own stars, progress and handwriting.
+
+- The **student chip** in the app header shows who is practising — tap it to switch (or to open the parent page).
+- **Parent page → Students**: add a child, rename, delete (deletes their history and handwriting too), review their writing, and open the print page.
+- The app names the first child **“Student 1”** — rename it to the child who already has history, then add the others.
+- With `DATABASE_URL` set everything lives in Postgres (`wf_students`, `wf_work`), so names and handwriting follow every device.
+
+### Review and print
+
+Every completed letter/character is stored as the child’s real ink:
+
+- **Parent page → Students → Review** shows thumbnails of the latest 60 exercises per child (score, time, set). Tap one to enlarge; the faint blue lines are the guide that was traced.
+- **Print / review page** (also `/results?student=<id>`) is a printable sheet: student name, date range, and a grid of their writing, three per row on A4. Use the browser’s **Print** to make a PDF or a paper copy.
+- New handwriting queues in the browser when offline and uploads automatically when the connection returns.
+
 ## The parent page (`/admin`)
 
 | Tab | What it does |
@@ -202,9 +219,11 @@ The pure scoring code lives in `public/js/scoring.js` and has unit tests (`npm t
 server/
   index.js        Express app, API, admin auth
   store.js        Config load/save, validation, optional gist sync
-  db.js           Postgres storage (config + practice history)
+  db.js           Postgres storage (config, students, history, handwriting)
   progress.js     History validation and merging
   progress-store.js  History read/write on top of the database
+  students.js     Student list, names and deletion
+  work.js         Handwriting validation and storage
   hanzi.js        Stroke data fetch + disk/memory cache (hanzi-writer-data)
   wadegiles.js    Hanyu Pinyin → Wade-Giles conversion (tested)
   auth.js         PIN + signed cookie
@@ -226,7 +245,11 @@ public/
     ui.js         DOM helpers, icons, sheet, stars, confetti
     api.js        Fetch helpers
     settings.js   Per-device overrides
-    history.js    Star history: localStorage cache + database sync
+    history.js    Star history per student: local cache + database sync
+    students.js   Who is practising (selection + cached names)
+    work.js       Offline queue for finished handwriting
+    inkrender.js  Draws saved handwriting into a canvas
+    results.js    Printable review page per student
     sound.js      WebAudio feedback
   css/
   icons/          Generated app icons

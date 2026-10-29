@@ -1,6 +1,6 @@
 /* Offline shell for the iPad home-screen app.
    Bump VERSION when you deploy changed app files. */
-const VERSION = 'writing-fun-v25';
+const VERSION = 'writing-fun-v27';
 const SHELL = [
   '/',
   '/index.html',
@@ -23,11 +23,17 @@ const SHELL = [
   '/js/i18n.js',
   '/js/settings.js',
   '/js/history.js',
+  '/js/students.js',
+  '/js/work.js',
+  '/js/inkrender.js',
   '/js/sound.js',
   '/js/speech.js',
   '/icons/icon-180.png',
   '/icons/icon-192.png',
   '/icons/icon-512.png',
+  '/results.html',
+  '/css/results.css',
+  '/js/results.js',
 ];
 
 self.addEventListener('install', (event) => {
@@ -71,7 +77,9 @@ self.addEventListener('fetch', (event) => {
   if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/admin') || url.pathname.startsWith('/strokes')) return;
 
   if (req.mode === 'navigate') {
-    event.respondWith(networkFirst(req, '/index.html'));
+    event.respondWith(
+      networkFirst(req, url.pathname.startsWith('/results') ? '/results.html' : '/index.html'),
+    );
     return;
   }
 

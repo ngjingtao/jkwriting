@@ -1,4 +1,5 @@
-import { h, icon, toast, clear } from './ui.js';
+import { h, icon, toast, clear, openSheet } from './ui.js';
+import { drawWork } from './inkrender.js';
 
 const root = document.getElementById('admin');
 const state = {
@@ -10,6 +11,10 @@ const state = {
   gist: false,
   db: false,
   dbConfigured: false,
+  students: null,
+  studentId: null,
+  work: [],
+  workFor: null,
   storage: 'file',
   defaultPin: false,
 };
@@ -161,6 +166,8 @@ async function init() {
     state.admin = Boolean(session.admin);
     state.gist = Boolean(session.gist);
     state.selectedId = cfg.sets?.[0]?.id || null;
+    const hash = location.hash.replace('#', '');
+    if (TABS.some((tab) => tab.id === hash)) state.tab = hash;
     if (state.admin) await loadStatus();
   } catch {
     root.append(h('div', { class: 'empty' }, 'Cannot reach the server. Is it running?'));
@@ -300,6 +307,7 @@ function header() {
 
 const TABS = [
   { id: 'sets', label: 'Word lists' },
+  { id: 'students', label: 'Students' },
   { id: 'practice', label: 'Practice' },
   { id: 'scoring', label: 'Scoring' },
   { id: 'data', label: 'Backup' },
@@ -328,10 +336,255 @@ function tabsView() {
 }
 
 function contentView() {
+  if (state.tab === 'students') return studentsTab();
   if (state.tab === 'practice') return practiceTab();
   if (state.tab === 'scoring') return scoringTab();
   if (state.tab === 'data') return dataTab();
   return setsTab();
+}
+
+/* -------------------------------- students -------------------------------- */
+
+function shortDate(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function studentsTab() {
+  const panel = h('div', { class: 'panel' });
+
+  const nameInput = h('input', {
+    class: 'input',
+    placeholder: 'New student name',
+    maxlength: '24',
+    style: { maxWidth: '240px' },
+  });
+  const addBtn = h(
+    'button',
+    { class: 'btn primary', onclick: () => addStudent() },
+    icon('plus'),
+    'Add student',
+  );
+
+  const listBox = h('div', { class: 'student-admin-list' }, h('div', { class: 'empty' }, 'Loading…'));
+  const workHead = h('div', { class: 'work-head' });
+  const grid = h('div', { class: 'work-grid' });
+
+  async function addStudent() {
+    const name = nameInput.value.trim();
+    if (!name) return;
+    addBtn.disabled = true;
+    try {
+      const res = await fetch('/api/students', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      if (!res.ok) {
+        toast(res.status === 409 ? 'That name is already used' : 'Could not add the student');
+        return;
+      }
+      const data = await res.json();
+      nameInput.value = '';
+      state.studentId = data.student.id;
+      await reload(true);
+    } catch {
+      toast('Could not add the student');
+    } finally {
+      addBtn.disabled = false;
+    }
+  }
+
+  function paintList() {
+    clear(listBox);
+    const students = state.students || [];
+    if (!students.length) {
+      listBox.append(h('div', { class: 'empty' }, 'No students yet.'));
+      return;
+    }
+    for (const student of students) {
+      const active = student.id === state.studentId;
+      listBox.append(
+        h(
+          'div',
+          { class: `student-admin-row${active ? ' active' : ''}` },
+          h(
+            'div',
+            { class: 'sa-main', onclick: () => select(student.id) },
+            h('div', { class: 'sa-name' }, student.name),
+            h(
+              'div',
+              { class: 'sa-meta' },
+              `${student.work || 0} exercises · ${student.stars || 0} stars` +
+                (student.lastTs ? ` · last ${shortDate(student.lastTs)}` : ''),
+            ),
+          ),
+          h(
+            'div',
+            { class: 'sa-actions' },
+            h('button', { class: 'btn ghost sm', onclick: () => select(student.id) }, 'Review'),
+            h('button', { class: 'btn ghost sm', onclick: () => rename(student) }, 'Rename'),
+            h('button', { class: 'btn ghost sm', onclick: () => print(student.id) }, 'Print'),
+            h('button', { class: 'btn ghost sm danger', onclick: () => remove(student) }, 'Delete'),
+          ),
+        ),
+      );
+    }
+  }
+
+  function select(id) {
+    state.studentId = id;
+    paintList();
+    loadWork(id);
+  }
+
+  function print(id) {
+    window.open(`/results?student=${encodeURIComponent(id)}`, '_blank', 'noopener');
+  }
+
+  async function rename(student) {
+    const next = window.prompt('Student name', student.name);
+    if (!next || next.trim() === student.name) return;
+    const res = await fetch(`/api/students/${encodeURIComponent(student.id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: next.trim() }),
+    });
+    if (!res.ok) {
+      toast(res.status === 409 ? 'That name is already used' : 'Could not rename');
+      return;
+    }
+    await reload(true);
+  }
+
+  async function remove(student) {
+    const ok = window.confirm(
+      `Delete ${student.name} and all of their handwriting?\n\nThis cannot be undone.`,
+    );
+    if (!ok) return;
+    const res = await fetch(`/api/students/${encodeURIComponent(student.id)}`, { method: 'DELETE' });
+    if (!res.ok) {
+      toast('Could not delete the student');
+      return;
+    }
+    state.studentId = null;
+    state.work = [];
+    await reload(true);
+  }
+
+  function paintWork() {
+    clear(grid);
+    const work = state.work || [];
+    const student = (state.students || []).find((s) => s.id === state.studentId);
+    clear(workHead);
+    workHead.append(
+      h('h3', {}, student ? `${student.name} — handwriting` : 'Handwriting'),
+      h(
+        'div',
+        { class: 'work-head-actions' },
+        h(
+          'button',
+          { class: 'btn soft sm', onclick: () => print(state.studentId), disabled: !state.studentId },
+          icon('download'),
+          'Print / review page',
+        ),
+        h(
+          'button',
+          { class: 'btn ghost sm', onclick: () => loadWork(state.studentId) },
+          icon('refresh'),
+          'Refresh',
+        ),
+      ),
+    );
+    if (!student) {
+      grid.append(h('div', { class: 'empty' }, 'Choose a student to see their handwriting.'));
+      return;
+    }
+    if (!work.length) {
+      grid.append(h('div', { class: 'empty' }, 'No handwriting yet — finish a letter in the app.'));
+      return;
+    }
+    for (const item of work) {
+      const canvas = h('canvas', { class: 'work-canvas' });
+      const card = h(
+        'button',
+        { class: 'work-card', onclick: () => openWork(item, student) },
+        canvas,
+        h('div', { class: 'wc-unit' }, item.unit),
+        h('div', { class: 'wc-meta' }, `${item.pct}% · ${shortDate(item.ts)}`),
+      );
+      grid.append(card);
+      drawWork(canvas, item, { size: 132 });
+    }
+  }
+
+  function openWork(item, student) {
+    const canvas = h('canvas', { class: 'work-canvas-large' });
+    const sheet = openSheet({
+      title: `${student.name} · ${item.unit}`,
+      sub: `${item.token !== item.unit ? item.token + ' · ' : ''}${item.setName || 'Practice'} · ${item.pct}% · ${shortDate(item.ts)}`,
+      body: h('div', { class: 'work-detail' }, canvas, h('p', { class: 'work-hint' }, 'Blue lines show the guide that was traced.')),
+    });
+    drawWork(canvas, item, { size: Math.min(360, window.innerWidth - 80) });
+    return sheet;
+  }
+
+  async function loadWork(id) {
+    if (!id) {
+      paintWork();
+      return;
+    }
+    try {
+      const res = await fetch(`/api/work?student=${encodeURIComponent(id)}&limit=60`, {
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error('work');
+      const data = await res.json();
+      state.work = Array.isArray(data.work) ? data.work : [];
+      state.workFor = id;
+    } catch {
+      state.work = [];
+    }
+    paintWork();
+  }
+
+  async function reload(force = false) {
+    if (!state.students || force) {
+      try {
+        const res = await fetch('/api/students', { cache: 'no-store' });
+        const data = await res.json();
+        state.students = Array.isArray(data.students) ? data.students : [];
+      } catch {
+        state.students = [];
+      }
+    }
+    if (!state.studentId && state.students?.length) state.studentId = state.students[0].id;
+    if (state.studentId && !state.students?.some((s) => s.id === state.studentId)) {
+      state.studentId = state.students?.[0]?.id || null;
+    }
+    paintList();
+    await loadWork(state.studentId);
+  }
+
+  panel.append(
+    h('h2', {}, 'Students'),
+    h(
+      'p',
+      { class: 'hint' },
+      'Everyone practises the same word lists and stroke guides. Stars, progress and handwriting are kept separately for each student — the database stores them, so they follow you across devices.',
+    ),
+    h('div', { class: 'student-add' }, nameInput, addBtn),
+    listBox,
+    h('div', { class: 'work-panel' }, workHead, grid),
+  );
+
+  reload();
+  return panel;
 }
 
 /* ------------------------------- word lists ------------------------------- */

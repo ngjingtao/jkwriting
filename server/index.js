@@ -3,6 +3,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig, resetConfig, syncState } from './store.js';
 import { loadProgress, saveProgress } from './progress-store.js';
+import { listStudents, addStudent, renameStudent, removeStudent } from './students.js';
+import { saveWork, listWork, clearWork } from './work.js';
 import { getHanzi } from './hanzi.js';
 import {
   checkPin,
@@ -75,6 +77,78 @@ app.post('/api/progress', async (req, res, next) => {
     res.json(await saveProgress(body.profile, body.entries));
   } catch (err) {
     next(err);
+  }
+});
+
+/* ------------------------------- students ------------------------------- */
+
+function sendError(res, err, next) {
+  if (err && err.status) return res.status(err.status).json({ error: err.message });
+  return next(err);
+}
+
+app.get('/api/students', async (req, res, next) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ students: await listStudents() });
+  } catch (err) {
+    next(err);
+  }
+});
+
+app.post('/api/students', requireAdmin, async (req, res, next) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    res.status(201).json({ student: await addStudent(body.name) });
+  } catch (err) {
+    sendError(res, err, next);
+  }
+});
+
+app.put('/api/students/:id', requireAdmin, async (req, res, next) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    res.json({ student: await renameStudent(req.params.id, body.name) });
+  } catch (err) {
+    sendError(res, err, next);
+  }
+});
+
+app.delete('/api/students/:id', requireAdmin, async (req, res, next) => {
+  try {
+    res.json({ ok: true, removed: (await removeStudent(req.params.id)).id });
+  } catch (err) {
+    sendError(res, err, next);
+  }
+});
+
+/* --------------------------------- work ---------------------------------- */
+
+app.get('/api/work', async (req, res, next) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    const before = req.query.before === undefined ? null : Number(req.query.before);
+    res.json(await listWork(String(req.query.student || ''), req.query.limit, before));
+  } catch (err) {
+    sendError(res, err, next);
+  }
+});
+
+app.post('/api/work', async (req, res, next) => {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    res.status(201).json(await saveWork(body));
+  } catch (err) {
+    sendError(res, err, next);
+  }
+});
+
+app.delete('/api/work', requireAdmin, async (req, res, next) => {
+  try {
+    const id = req.query.id === undefined ? null : req.query.id;
+    res.json(await clearWork(String(req.query.student || ''), id));
+  } catch (err) {
+    sendError(res, err, next);
   }
 });
 
@@ -151,6 +225,7 @@ app.get('/api/admin/status', requireAdmin, (req, res) => {
 
 app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
 app.get('/strokes', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'strokes.html')));
+app.get('/results', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'results.html')));
 
 app.use(
   express.static(PUBLIC_DIR, {

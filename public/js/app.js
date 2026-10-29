@@ -4,7 +4,15 @@ import { setStrokeOverrides } from './fontfit.js';
 import { h, icon, openSheet, switchRow, segmented, clear } from './ui.js';
 import { getSettings, getHomeLang, setHomeLang, setOverride, clearOverrides } from './settings.js';
 import { makeT } from './i18n.js';
-import { progressStats, initHistorySync } from './history.js';
+import { progressStats, initHistorySync, syncProgress } from './history.js';
+import {
+  currentStudentId,
+  ensureStudent,
+  loadStudents,
+  setCurrentStudent,
+  studentName,
+} from './students.js';
+import { initWorkSync } from './work.js';
 import { setSound } from './sound.js';
 import { setSpeechEnabled } from './speech.js';
 
@@ -32,8 +40,16 @@ async function boot() {
   setSpeechEnabled(settings.speakOnComplete !== false);
   renderHome();
   initHistorySync();
+  initWorkSync();
+  ensureStudent().then(updateStudentChip);
   window.addEventListener('wf:progress', (event) => {
     if (event.detail?.changed && state.lang === 'progress' && !state.practice) renderHome();
+  });
+  window.addEventListener('wf:student', () => {
+    if (state.practice) return;
+    syncProgress();
+    renderHome();
+    updateStudentChip();
   });
   registerServiceWorker();
 }
@@ -148,6 +164,12 @@ function renderHome() {
       h(
         'div',
         { style: { display: 'flex', gap: '8px', alignItems: 'center' } },
+        h(
+          'button',
+          { class: 'student-chip', id: 'student-chip', onclick: openStudentSheet, title: 'Student' },
+          icon('users'),
+          h('span', {}, studentName()),
+        ),
         h(
           'button',
           { class: 'icon-btn', 'aria-label': t('settings.title'), onclick: () => openSettings(settings) },
@@ -322,6 +344,47 @@ function startPractice(item, set, index, lang, kind) {
   });
   state.practice = practice;
   practice.mount();
+}
+
+function updateStudentChip() {
+  const chip = document.getElementById('student-chip');
+  if (!chip) return;
+  const label = chip.querySelector('span');
+  if (label) label.textContent = studentName();
+}
+
+async function openStudentSheet() {
+  const list = await loadStudents(true);
+  const body = h('div', { class: 'student-list' });
+  for (const student of list) {
+    body.append(
+      h(
+        'button',
+        {
+          class: `student-option${student.id === currentStudentId() ? ' active' : ''}`,
+          onclick: () => {
+            setCurrentStudent(student.id);
+            sheet.close();
+          },
+        },
+        icon('users'),
+        h('span', {}, student.name),
+        student.id === currentStudentId() ? h('span', { class: 'so-check' }, '✓') : null,
+      ),
+    );
+  }
+  body.append(
+    h(
+      'a',
+      { class: 'ghost-link', href: '/admin#students', style: { justifyContent: 'center', padding: '10px' } },
+      'Manage students',
+    ),
+  );
+  const sheet = openSheet({
+    title: 'Who is writing?',
+    sub: 'The word lists are shared — each student keeps their own stars and handwriting.',
+    body,
+  });
 }
 
 function openSettings(settings) {

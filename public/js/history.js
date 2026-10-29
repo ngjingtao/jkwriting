@@ -2,16 +2,33 @@
 // has a database configured, /api/progress merges it so the same stars and
 // words show up on every device.
 
+import { currentStudentId } from './students.js';
+
 const KEY = 'wf.history.v1';
+const MIGRATED = 'wf.history.migrated.v1';
 const MAX = 500;
-const PROFILE = 'family';
 const SYNC_INTERVAL = 60000;
+
+const storageKey = () => `${KEY}.${currentStudentId()}`;
+
+// Older versions kept one list for everybody; give it to the default student.
+function migrateLegacy() {
+  try {
+    if (localStorage.getItem(MIGRATED)) return;
+    const old = localStorage.getItem(KEY);
+    if (old && !localStorage.getItem(`${KEY}.family`)) localStorage.setItem(`${KEY}.family`, old);
+    localStorage.setItem(MIGRATED, '1');
+  } catch {
+    /* ignore */
+  }
+}
+migrateLegacy();
 
 const keyOf = (entry) => `${entry.ts}|${entry.text}`;
 
 export function getHistory() {
   try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || '[]');
+    const raw = JSON.parse(localStorage.getItem(storageKey()) || '[]');
     return Array.isArray(raw) ? raw : [];
   } catch {
     return [];
@@ -20,7 +37,7 @@ export function getHistory() {
 
 function saveHistory(list) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(list.slice(-MAX)));
+    localStorage.setItem(storageKey(), JSON.stringify(list.slice(-MAX)));
   } catch {
     /* ignore quota */
   }
@@ -48,9 +65,10 @@ export async function syncProgress() {
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return { ok: false, offline: true };
   if (inFlight) return inFlight;
   inFlight = (async () => {
+    const profile = currentStudentId();
     try {
       const local = getHistory();
-      const res = await fetch(`/api/progress?profile=${PROFILE}`, {
+      const res = await fetch(`/api/progress?profile=${profile}`, {
         cache: 'no-store',
         signal: AbortSignal.timeout(9000),
       });
@@ -67,7 +85,7 @@ export async function syncProgress() {
           await fetch('/api/progress', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profile: PROFILE, entries: missing }),
+            body: JSON.stringify({ profile, entries: missing }),
             signal: AbortSignal.timeout(9000),
           });
         }
