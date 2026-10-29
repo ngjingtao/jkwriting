@@ -159,6 +159,7 @@ The generated guide already handles `p/q/r/u/a/b` with separate stem/bowl/arm st
 - **A · Latin words / phrases** practise **one letter at a time**; spaces and punctuation are skipped (`good morning` → g,o,o,d,m,o,r,n,i,n,g). Repeat runs the whole word again.
 - **B · Chinese words / phrases** practise **one character at a time** (`早上好` → 早, 上, 好). Pinyin, Wade-Giles and stroke data are added automatically.
 - **C · Mixed passages** are split into Chinese characters and Latin words; the current sentence stays visible above the practice box. Each word/character is scored and read aloud as it is finished, then the whole passage gets a summary. Repeat does not apply to passages.
+- **Passages wrap freely.** A single line break is just a space — a paragraph typed over several lines is practised as **one** passage. Leave a **blank line** to start another passage in the same set. (Wrapped lines are kept for display; only punctuation ends a sentence in the context bar.)
 - **Meaning** is optional: `cat | 猫 · kucing`.
 - Letters and digits are supported: `a–z`, `A–Z`, `0–9`.
 - Duplicate lines in a list are dropped on save.

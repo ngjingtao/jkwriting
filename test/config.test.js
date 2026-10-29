@@ -54,3 +54,17 @@ test('practice text size is clamped and carried through', () => {
   assert.equal(sanitizeConfig({ practice: { wordSize: 10 } }).practice.wordSize, 70);
   assert.equal(sanitizeConfig({ practice: { wordSize: 'big' } }).practice.wordSize, 100);
 });
+
+test('a wrapped passage is stored on one line', () => {
+  const config = sanitizeConfig({
+    sets: [
+      {
+        id: 'p',
+        kind: 'passage',
+        name: 'Wrapped',
+        items: [{ text: 'Line one\nLine two\n\tindented' }],
+      },
+    ],
+  });
+  assert.equal(config.sets[0].items[0].text, 'Line one Line two indented');
+});

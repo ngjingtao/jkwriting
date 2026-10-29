@@ -48,6 +48,13 @@ function homeTabs(t) {
   ];
 }
 
+function setCount(t, set) {
+  if (set.kind !== 'passage') return t('home.words', { n: set.items.length });
+  return set.items.length === 1
+    ? t('home.passageOne')
+    : t('home.passages', { n: set.items.length });
+}
+
 function setsForTab(config) {
   return config.sets.filter((set) => {
     if (!set.enabled) return false;
@@ -105,7 +112,7 @@ function renderHome() {
       const sample = isPassage
         ? `${set.items[0].text.slice(0, 56)}${set.items[0].text.length > 56 ? '…' : ''}`
         : set.items.slice(0, 8).map((i) => i.text).join(' ');
-      const meta = [t('home.words', { n: set.items.length })];
+      const meta = [setCount(t, set)];
       if (set.repeat > 1) meta.push(`×${set.repeat}`);
       grid.append(
         h(
@@ -279,7 +286,7 @@ function openSet(set) {
 
   const opened = openSheet({
     title: set.name,
-    sub: `${t('home.words', { n: set.items.length })}${set.repeat > 1 ? ` · ×${set.repeat}` : ''}`,
+    sub: `${setCount(t, set)}${set.repeat > 1 ? ` · ×${set.repeat}` : ''}`,
     body,
   });
   sheet.close = opened.close;

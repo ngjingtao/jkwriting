@@ -42,6 +42,8 @@ const int = (v, def, min, max) => {
 
 const cleanText = (v, max) =>
   String(v ?? '')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
     .replace(/[\u0000-\u001f\u007f]/g, '')
     .trim()
     .slice(0, max);
@@ -89,7 +91,7 @@ function cleanSet(raw, index) {
   const kind = oneOf(raw.kind, ['latin', 'chinese', 'passage'], langRaw === 'zh' ? 'chinese' : 'latin');
   const lang = kind === 'chinese' ? 'zh' : langRaw === 'zh' ? 'en' : langRaw;
   const repeat = kind === 'passage' ? 1 : int(raw.repeat, 1, 1, 10);
-  const maxText = kind === 'passage' ? 900 : 24;
+  const maxText = kind === 'passage' ? 2000 : 24;
   const items = [];
   const seen = new Set();
   for (const entry of Array.isArray(raw.items) ? raw.items.slice(0, 300) : []) {

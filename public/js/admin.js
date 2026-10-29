@@ -336,13 +336,23 @@ function contentView() {
 
 /* ------------------------------- word lists ------------------------------- */
 
-function parseItems(text) {
+function parseItems(text, kind = 'latin') {
   const seen = new Set();
   const items = [];
-  for (const rawLine of String(text).split('\n')) {
-    const line = rawLine.trim();
-    if (!line) continue;
-    const [text0, meaning] = line.split('|').map((p) => p.trim());
+  // A passage may wrap over several lines: only a blank line starts a new
+  // one, so the whole paragraph is practised as a single passage.
+  const blocks = kind === 'passage' ? String(text).split(/\n\s*\n/) : String(text).split('\n');
+  for (const rawBlock of blocks) {
+    const block =
+      kind === 'passage' ? rawBlock.replace(/\s*\n\s*/g, ' ').trim() : rawBlock.trim();
+    if (!block) continue;
+    if (kind === 'passage') {
+      if (seen.has(block)) continue;
+      seen.add(block);
+      items.push({ text: block });
+      continue;
+    }
+    const [text0, meaning] = block.split('|').map((p) => p.trim());
     if (!text0 || seen.has(text0)) continue;
     seen.add(text0);
     items.push(meaning ? { text: text0, meaning } : { text: text0 });
@@ -351,7 +361,10 @@ function parseItems(text) {
 }
 
 function itemsToText(set) {
-  return set.items.map((i) => (i.meaning ? `${i.text} | ${i.meaning}` : i.text)).join('\n');
+  const joiner = set.kind === 'passage' ? '\n\n' : '\n';
+  return set.items
+    .map((i) => (i.meaning ? `${i.text} | ${i.meaning}` : i.text))
+    .join(joiner);
 }
 
 function setsTab() {
@@ -494,7 +507,7 @@ function setsTab() {
       wrap: 'soft',
       value: itemsToText(current),
       oninput: (e) => {
-        current.items = parseItems(e.target.value);
+        current.items = parseItems(e.target.value, current.kind);
         countTag.textContent = `${current.items.length} ${isPassage ? 'passages' : 'items'}`;
         markDirty();
       },
@@ -504,7 +517,7 @@ function setsTab() {
       current.kind === 'chinese'
         ? 'One word or phrase per line. Practised character by character. Pinyin and Wade-Giles are added automatically.'
         : current.kind === 'passage'
-          ? 'One passage per line. Chinese and Latin can be mixed; each character or word is practised in turn.'
+          ? 'One passage per block. Line breaks stay inside a passage; leave a blank line to start another one. Chinese and Latin can be mixed; each character or word is practised in turn.'
           : 'One word or phrase per line. Practised letter by letter.';
 
     right = h(

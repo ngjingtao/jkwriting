@@ -114,9 +114,11 @@ export function parsePassage(text, latinLang = 'en') {
 function splitSentences(text) {
   const out = [];
   let buffer = '';
-  for (const ch of String(text)) {
+  // Line breaks are ordinary whitespace: a passage keeps its context across
+  // wrapped lines and only punctuation starts a new sentence.
+  for (const ch of String(text).replace(/\s+/g, ' ')) {
     buffer += ch;
-    if (/[.!?。！？;；\n]/.test(ch)) {
+    if (/[.!?。！？;；]/.test(ch)) {
       if (buffer.trim()) out.push(buffer.trim());
       buffer = '';
     }

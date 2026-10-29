@@ -39,3 +39,26 @@ test('mixed detection', () => {
 test('splitUnits drops spaces', () => {
   assert.deepEqual(splitUnits('a b'), ['a', 'b']);
 });
+
+test('a line break does not start a new sentence or practice', () => {
+  const tokens = parsePassage('Good morning\nI brush my teeth\nThen I go to school.', 'en');
+  assert.deepEqual(
+    tokens.map((t) => t.text),
+    ['Good', 'morning', 'I', 'brush', 'my', 'teeth', 'Then', 'I', 'go', 'to', 'school'],
+  );
+  assert.equal(tokens[1].sentence, 'Good morning I brush my teeth Then I go to school.');
+});
+
+test('punctuation still separates sentences for the context bar', () => {
+  const tokens = parsePassage('I brush my teeth. I eat breakfast.', 'en');
+  assert.equal(tokens[0].sentence, 'I brush my teeth.');
+  assert.equal(tokens.at(-1).sentence, 'I eat breakfast.');
+});
+
+test('a wrapped mixed passage keeps every unit', () => {
+  const tokens = parsePassage('Good morning!\n早上好！\nI brush my teeth.', 'en');
+  assert.deepEqual(
+    tokens.map((t) => t.text),
+    ['Good', 'morning', '早', '上', '好', 'I', 'brush', 'my', 'teeth'],
+  );
+});
