@@ -9,6 +9,7 @@ const state = {
   dirty: false,
   gist: false,
   db: false,
+  dbConfigured: false,
   storage: 'file',
   defaultPin: false,
 };
@@ -175,6 +176,7 @@ async function loadStatus() {
     const data = await res.json();
     state.gist = data.gist;
     state.db = Boolean(data.db);
+    state.dbConfigured = Boolean(data.dbConfigured);
     state.storage = data.storage || (data.db ? 'postgres' : 'file');
     state.defaultPin = data.defaultPin;
   } catch {
@@ -965,12 +967,18 @@ function dataTab() {
       { class: 'stat-line' },
       h(
         'span',
-        { class: `pill ${state.db || state.gist ? 'ok' : ''}` },
+        {
+          class: `pill ${state.db || state.gist || state.dbConfigured ? 'ok' : ''} ${
+            state.dbConfigured && !state.db ? 'warn' : ''
+          }`,
+        },
         state.db
           ? 'Postgres database: on'
-          : state.gist
-            ? 'GitHub gist sync: on'
-            : 'Server disk storage',
+          : state.dbConfigured
+            ? 'Database set but unreachable — using disk'
+            : state.gist
+              ? 'GitHub gist sync: on'
+              : 'Server disk storage',
       ),
       state.defaultPin ? h('span', { class: 'pill warn' }, 'Default PIN in use') : null,
     ),
@@ -983,6 +991,8 @@ function dataTab() {
         { style: { marginTop: '6px' } },
         state.db
           ? 'Word lists, settings, stroke edits and practice history are stored in the Postgres database (DATABASE_URL), so every device and every redeploy sees the same data.'
+          : state.dbConfigured
+            ? 'DATABASE_URL is set but the server could not connect, so it fell back to data/store.json — which is wiped whenever Render restarts or sleeps. Check the value (host, password, sslmode) and redeploy.'
           : state.gist
             ? 'Settings are saved to a private GitHub gist (GIST_ID + GITHUB_TOKEN), so they survive redeploys on Render’s free plan. Practice history stays on each iPad.'
             : 'Settings are saved to data/store.json on the server. On Render’s free plan the disk is ephemeral, so use Export / Import (or set DATABASE_URL / GIST_ID + GITHUB_TOKEN) to keep changes across redeploys.',

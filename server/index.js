@@ -139,6 +139,7 @@ app.get('/api/admin/status', requireAdmin, (req, res) => {
   res.json({
     gist: syncState.gist,
     db: syncState.db,
+    dbConfigured: Boolean(process.env.DATABASE_URL),
     storage: syncState.storage,
     lastSyncAt: syncState.lastSyncAt,
     lastError: syncState.lastError,
