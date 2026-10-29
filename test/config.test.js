@@ -46,3 +46,11 @@ test('removing an override is preserved for current stores', () => {
   const config = sanitizeConfig({ version: CONFIG_VERSION, strokes: {} });
   assert.deepEqual(config.strokes, {});
 });
+
+test('practice text size is clamped and carried through', () => {
+  assert.equal(sanitizeConfig({}).practice.wordSize, 100);
+  assert.equal(sanitizeConfig({ practice: { wordSize: 130 } }).practice.wordSize, 130);
+  assert.equal(sanitizeConfig({ practice: { wordSize: 400 } }).practice.wordSize, 180);
+  assert.equal(sanitizeConfig({ practice: { wordSize: 10 } }).practice.wordSize, 70);
+  assert.equal(sanitizeConfig({ practice: { wordSize: 'big' } }).practice.wordSize, 100);
+});

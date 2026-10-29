@@ -23,6 +23,7 @@ export const DEFAULT_CONFIG = {
     inkWidth: 0.055,
     inkColor: '#1f2937',
     boxScale: 1,
+    wordSize: 100, // % — the word/pinyin at the top of the practice screen
     showPinyin: true,
     showWadeGiles: true,
     showMeaning: true,

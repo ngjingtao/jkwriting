@@ -160,6 +160,7 @@ export function sanitizeConfig(raw) {
       inkWidth: clampNum(practice.inkWidth, base.practice.inkWidth, 0.02, 0.12),
       inkColor,
       boxScale: clampNum(practice.boxScale, base.practice.boxScale, 0.45, 1),
+      wordSize: int(practice.wordSize, base.practice.wordSize, 70, 180),
       showPinyin: bool(practice.showPinyin, base.practice.showPinyin),
       showWadeGiles: bool(practice.showWadeGiles, base.practice.showWadeGiles),
       showMeaning: bool(practice.showMeaning, base.practice.showMeaning),

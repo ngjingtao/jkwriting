@@ -61,6 +61,7 @@ export class Practice {
   async mount() {
     this.root = h('div', { class: 'practice' });
     this.root.style.setProperty('--box-scale', String(this.settings.boxScale || 1));
+    this.root.style.setProperty('--word-scale', String((this.settings.wordSize || 100) / 100));
     this._buildChrome();
     document.getElementById('app').append(this.root);
     this.surface = new WritingSurface(this.canvas, {

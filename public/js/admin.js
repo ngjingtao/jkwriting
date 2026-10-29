@@ -766,6 +766,19 @@ function practiceTab() {
         markDirty();
       },
     ),
+    sliderField(
+      'Practice text size',
+      'Size of the word, pinyin and passage sentence at the top of the practice screen. The writing box is unchanged — use “Practice box size” for that.',
+      p.wordSize ?? 100,
+      80,
+      180,
+      5,
+      (v) => `${v}%`,
+      (v) => {
+        p.wordSize = v;
+        markDirty();
+      },
+    ),
     field(
       'Ink colour',
       h('input', {
@@ -1044,5 +1057,13 @@ async function save() {
     }
   }
 }
+
+// Settings live on the server; leaving with unsaved edits is how word lists
+// and passages disappear, so ask before unloading.
+window.addEventListener('beforeunload', (event) => {
+  if (!state.dirty) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
 
 init();

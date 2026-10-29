@@ -52,6 +52,7 @@ export function getSettings(config) {
     inkWidth: config.practice.inkWidth,
     inkColor: config.practice.inkColor,
     boxScale: config.practice.boxScale,
+    wordSize: config.practice.wordSize ?? 100,
     showPinyin: config.practice.showPinyin,
     showWadeGiles: config.practice.showWadeGiles,
     showMeaning: config.practice.showMeaning,
