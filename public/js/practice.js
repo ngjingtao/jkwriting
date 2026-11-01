@@ -472,7 +472,7 @@ export class Practice {
     queueWork({
       student: currentStudentId(),
       ts: Date.now(),
-      token: this.item?.text || unit.char,
+      token: this.tokens?.[this.tokenIndex]?.text || this.item?.text || unit.char,
       unit: unit.char,
       setName: this.setName || '',
       lang: this.lang,
