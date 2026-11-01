@@ -248,6 +248,7 @@ export class Practice {
           lang: this.lang,
           sentence: this.item.text,
           meaning: this.item.meaning || '',
+          pinyin: this.item.pinyin || '',
         },
       ];
     }
@@ -291,7 +292,7 @@ export class Practice {
     let built;
     try {
       built = await buildUnits(
-        { text: token.text, meaning: token.meaning, pinyin: token.pinyin },
+        { text: token.text, meaning: token.meaning, pinyin: token.pinyin, kind: this.kind },
         token.lang,
       );
     } catch (err) {

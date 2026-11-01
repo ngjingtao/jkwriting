@@ -75,7 +75,7 @@ function setsForTab(config) {
   return config.sets.filter((set) => {
     if (!set.enabled) return false;
     if (state.lang === 'passage') return set.kind === 'passage';
-    if (state.lang === 'zh') return set.kind === 'chinese';
+    if (state.lang === 'zh') return set.kind === 'chinese' || set.kind === 'cizu';
     return set.kind === 'latin' && set.lang === state.lang;
   });
 }

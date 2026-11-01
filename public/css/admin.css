@@ -600,3 +600,8 @@
   font-size: 12px;
   color: var(--muted);
 }
+
+.lang-badge.cizu {
+  background: #eef2ff;
+  color: #4338ca;
+}

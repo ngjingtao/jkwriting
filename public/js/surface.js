@@ -427,23 +427,31 @@ export class WritingSurface {
     ctx.lineWidth = 1;
 
     if (this.unit?.script === 'hanzi') {
+      const n = Math.max(1, this.unit.composite || 1);
+      const w = size / n;
+      const top = y + (size - w) / 2;
       ctx.strokeStyle = GRID;
       ctx.setLineDash([size * 0.016, size * 0.016]);
       ctx.beginPath();
-      ctx.moveTo(x + size / 2, y + size * 0.04);
-      ctx.lineTo(x + size / 2, y + size * 0.96);
-      ctx.moveTo(x + size * 0.04, y + size / 2);
-      ctx.lineTo(x + size * 0.96, y + size / 2);
-      if (style === 'mi') {
-        ctx.moveTo(x + size * 0.08, y + size * 0.08);
-        ctx.lineTo(x + size * 0.92, y + size * 0.92);
-        ctx.moveTo(x + size * 0.92, y + size * 0.08);
-        ctx.lineTo(x + size * 0.08, y + size * 0.92);
+      for (let i = 0; i < n; i += 1) {
+        const left = x + i * w;
+        ctx.moveTo(left + w / 2, top + w * 0.04);
+        ctx.lineTo(left + w / 2, top + w * 0.96);
+        ctx.moveTo(left + w * 0.04, top + w / 2);
+        ctx.lineTo(left + w * 0.96, top + w / 2);
+        if (style === 'mi') {
+          ctx.moveTo(left + w * 0.08, top + w * 0.08);
+          ctx.lineTo(left + w * 0.92, top + w * 0.92);
+          ctx.moveTo(left + w * 0.92, top + w * 0.08);
+          ctx.lineTo(left + w * 0.08, top + w * 0.92);
+        }
       }
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.strokeStyle = 'rgba(99,116,139,0.22)';
-      ctx.strokeRect(x + size * 0.035, y + size * 0.035, size * 0.93, size * 0.93);
+      for (let i = 0; i < n; i += 1) {
+        ctx.strokeRect(x + i * w + w * 0.035, top + w * 0.035, w * 0.93, w * 0.93);
+      }
     } else {
       const lines = [
         { at: latinMetrics().capTop, solid: false },
@@ -481,11 +489,17 @@ export class WritingSurface {
   _fillHanzi(ctx, stroke, color, alpha = 1) {
     const path = this._path2d(stroke);
     if (!path) return false;
+    // A 词组 unit stacks several characters; each stroke knows its cell.
+    const cell = stroke.cell;
+    const scale = this.box.size * (cell ? cell.w : 1);
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
-    ctx.translate(this.box.x, this.box.y + (900 / 1024) * this.box.size);
-    ctx.scale(this.box.size / 1024, -this.box.size / 1024);
+    ctx.translate(
+      this.box.x + (cell ? cell.x * this.box.size : 0),
+      this.box.y + (cell ? (cell.y + (900 / 1024) * cell.w) * this.box.size : (900 / 1024) * this.box.size),
+    );
+    ctx.scale(scale / 1024, -scale / 1024);
     ctx.fill(path);
     ctx.restore();
     return true;

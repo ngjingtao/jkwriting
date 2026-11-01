@@ -64,8 +64,75 @@
 
 .r-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
   gap: 14px;
+}
+
+/* 100% = one writing per page, 50% = two, 25% = four. */
+.r-grid.r-size-100 {
+  grid-template-columns: 1fr;
+}
+
+.r-grid.r-size-50 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.r-grid.r-size-25 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 900px) {
+  .r-grid.r-size-100 {
+    grid-template-columns: 1fr;
+  }
+  .r-grid.r-size-50,
+  .r-grid.r-size-25 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .r-grid.r-size-50,
+  .r-grid.r-size-25 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.r-sizes {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #e5e0d6;
+}
+
+.r-sizes-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #9a9184;
+  padding: 0 6px;
+}
+
+.r-size-btn {
+  min-width: 54px;
+  min-height: 34px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #4b5563;
+  font: inherit;
+  font-weight: 800;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.r-size-btn.active {
+  background: #4f46e5;
+  color: #fff;
 }
 
 .r-card {
@@ -169,6 +236,9 @@
   .results-body {
     background: #fff;
   }
+  .r-sizes {
+    display: none;
+  }
   .r-shell {
     max-width: none;
     padding: 0;
@@ -181,8 +251,24 @@
     font-size: 19px;
   }
   .r-grid {
-    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
+  }
+  .r-grid.r-size-100 {
+    grid-template-columns: 1fr;
+  }
+  .r-grid.r-size-50 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .r-grid.r-size-25 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .r-grid.r-size-100 .r-card {
+    break-after: page;
+    page-break-after: always;
+  }
+  .r-grid.r-size-100 .r-card:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
   .r-card {
     border-color: #d8d2c6;

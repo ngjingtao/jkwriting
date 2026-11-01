@@ -68,3 +68,41 @@ test('a wrapped passage is stored on one line', () => {
   });
   assert.equal(config.sets[0].items[0].text, 'Line one Line two indented');
 });
+
+test('ci zu sets are Chinese and keep at most three characters', () => {
+  const config = sanitizeConfig({
+    sets: [
+      {
+        id: 'cizu',
+        kind: 'cizu',
+        name: '词组',
+        items: [{ text: '早上好' }, { text: '我们' }, { text: '一二三四五' }],
+      },
+    ],
+  });
+  const set = config.sets[0];
+  assert.equal(set.kind, 'cizu');
+  assert.equal(set.lang, 'zh');
+  assert.deepEqual(
+    set.items.map((i) => i.text),
+    ['早上好', '我们', '一二三'],
+  );
+});
+
+test('manual pinyin survives validation', () => {
+  const config = sanitizeConfig({
+    sets: [
+      {
+        id: 'zh',
+        kind: 'chinese',
+        name: 'Words',
+        items: [{ text: '早上', pinyin: 'zǎo shang', meaning: 'morning' }],
+      },
+    ],
+  });
+  assert.deepEqual(config.sets[0].items[0], {
+    text: '早上',
+    pinyin: 'zǎo shang',
+    meaning: 'morning',
+  });
+});

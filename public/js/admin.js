@@ -1,5 +1,6 @@
 import { h, icon, toast, clear, openSheet } from './ui.js';
 import { drawWork } from './inkrender.js';
+import { pinyinFromNumbered } from './pinyin.js';
 
 const root = document.getElementById('admin');
 const state = {
@@ -41,10 +42,11 @@ const MODES = [
 const KINDS = [
   { id: 'latin', label: 'A · Latin words / phrases' },
   { id: 'chinese', label: 'B · Chinese words / phrases' },
-  { id: 'passage', label: 'C · Mixed passage' },
+  { id: 'cizu', label: 'C · 词组 (2–3 characters together)' },
+  { id: 'passage', label: 'D · Mixed passage' },
 ];
 
-const KIND_LABEL = { latin: 'LATIN', chinese: '中文', passage: 'PASSAGE' };
+const KIND_LABEL = { latin: 'LATIN', chinese: '中文', cizu: '词组', passage: 'PASSAGE' };
 
 /* --------------------------------- helpers -------------------------------- */
 
@@ -615,10 +617,23 @@ function parseItems(text, kind = 'latin') {
   for (const rawLine of String(text).split('\n')) {
     const line = rawLine.trim();
     if (!line) continue;
-    const [text0, meaning] = line.split('|').map((p) => p.trim());
+    let [text0, meaning] = line.split('|').map((p) => p.trim());
+    let pinyin = '';
+    if (kind === 'chinese' || kind === 'cizu') {
+      // 早上 (zǎo shang) | morning
+      const match = text0.match(/^(.*?)\s*\(([^()]+)\)\s*$/);
+      if (match) {
+        text0 = match[1].trim();
+        pinyin = pinyinFromNumbered(match[2].trim());
+      }
+      if (kind === 'cizu') text0 = Array.from(text0).slice(0, 3).join('');
+    }
     if (!text0 || seen.has(text0)) continue;
     seen.add(text0);
-    items.push(meaning ? { text: text0, meaning } : { text: text0 });
+    const item = { text: text0 };
+    if (pinyin) item.pinyin = pinyin;
+    if (meaning) item.meaning = meaning;
+    items.push(item);
   }
   return items;
 }
@@ -626,7 +641,10 @@ function parseItems(text, kind = 'latin') {
 function itemsToText(set) {
   const joiner = set.kind === 'passage' ? '\n\n---\n\n' : '\n';
   return set.items
-    .map((i) => (i.meaning ? `${i.text} | ${i.meaning}` : i.text))
+    .map((i) => {
+      const head = i.pinyin ? `${i.text} (${i.pinyin})` : i.text;
+      return i.meaning ? `${head} | ${i.meaning}` : head;
+    })
     .join(joiner);
 }
 
@@ -719,7 +737,7 @@ function setsTab() {
         class: 'select',
         onchange: (e) => {
           current.kind = e.target.value;
-          if (current.kind === 'chinese') current.lang = 'zh';
+          if (current.kind === 'chinese' || current.kind === 'cizu') current.lang = 'zh';
           else if (current.lang === 'zh') current.lang = 'en';
           if (current.kind === 'passage') current.repeat = 1;
           markDirty();
@@ -733,15 +751,15 @@ function setsTab() {
       'select',
       {
         class: 'select',
-        disabled: current.kind === 'chinese',
+        disabled: current.kind === 'chinese' || current.kind === 'cizu',
         onchange: (e) => {
           current.lang = e.target.value;
           markDirty();
         },
       },
-      ...LANGS.filter((l) => (current.kind === 'chinese' ? l.id === 'zh' : l.id !== 'zh')).map((l) =>
-        h('option', { value: l.id, selected: l.id === current.lang }, l.label),
-      ),
+      ...LANGS.filter((l) =>
+        current.kind === 'chinese' || current.kind === 'cizu' ? l.id === 'zh' : l.id !== 'zh',
+      ).map((l) => h('option', { value: l.id, selected: l.id === current.lang }, l.label)),
     );
 
     const repeatInput = h('input', {
@@ -778,10 +796,12 @@ function setsTab() {
 
     const help =
       current.kind === 'chinese'
-        ? 'One word or phrase per line. Practised character by character. Pinyin and Wade-Giles are added automatically.'
-        : current.kind === 'passage'
-          ? 'The whole text is one passage — line breaks and blank lines stay inside it, so every word is practised in the same run. Chinese and Latin can be mixed. To keep several passages in one list, put a line with --- between them.'
-          : 'One word or phrase per line. Practised letter by letter.';
+        ? 'One word or phrase per line, practised character by character. Pinyin and Wade-Giles are added automatically — to fix a reading, type the pinyin in brackets: 早上 (zǎo shang) | morning.'
+        : current.kind === 'cizu'
+          ? 'One 词组 per line — 2 or 3 characters written together on one screen. Type the pinyin in brackets if the automatic reading is wrong: 早上 (zǎo shang) | morning.'
+          : current.kind === 'passage'
+            ? 'The whole text is one passage — line breaks and blank lines stay inside it, so every word is practised in the same run. Chinese and Latin can be mixed. To keep several passages in one list, put a line with --- between them.'
+            : 'One word or phrase per line. Practised letter by letter.';
 
     right = h(
       'div',
@@ -793,7 +813,7 @@ function setsTab() {
         field(
           'Language / voice',
           langSelect,
-          current.kind === 'chinese'
+          current.kind === 'chinese' || current.kind === 'cizu'
             ? 'Chinese is detected automatically.'
             : 'Voice used to read the Latin words aloud.',
         ),

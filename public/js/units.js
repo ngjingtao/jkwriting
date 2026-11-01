@@ -1,4 +1,5 @@
 import { fittedLatinStrokes, ensureLatinFont } from './fontfit.js';
+import { pinyinFromNumbered } from './pinyin.js';
 import { fetchHanzi } from './api.js';
 
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
@@ -21,6 +22,8 @@ export async function buildUnits(item, lang) {
 
   const units = [];
   const header = [];
+
+  if (item.kind === 'cizu') return buildCizu(item, chars);
 
   if (lang === 'zh') {
     const pinyinParts = [];
@@ -67,7 +70,7 @@ export async function buildUnits(item, lang) {
     return {
       units,
       header,
-      pinyin: (item.pinyin || pinyinParts.join(' ')).trim(),
+      pinyin: pinyinFromNumbered(item.pinyin || '').trim() || pinyinParts.join(' ').trim(),
       wg: wgParts.join(' ').trim(),
       meaning: item.meaning || '',
     };
@@ -91,6 +94,68 @@ export async function buildUnits(item, lang) {
   }
   if (!units.length) throw new Error('empty');
   return { units, header, pinyin: '', wg: '', meaning: item.meaning || '' };
+}
+
+/**
+ * 词组 (ci zu): 2–3 characters written together on one screen.
+ * Each character gets its own square cell; the strokes of all cells become one
+ * flat list, so the child writes them in order and every stroke is scored.
+ */
+async function buildCizu(item, chars) {
+  const cellsChars = chars.slice(0, 3);
+  if (!cellsChars.length) throw new Error('empty');
+  const n = cellsChars.length;
+  const cell = 1 / n;
+  const y0 = (1 - cell) / 2;
+  const strokes = [];
+  const header = [];
+  const pinyinParts = [];
+  const wgParts = [];
+  let missing = null;
+
+  for (let i = 0; i < n; i += 1) {
+    const ch = cellsChars[i];
+    if (!isCJK(ch)) {
+      missing = ch;
+      continue;
+    }
+    let data;
+    try {
+      data = await fetchHanzi(ch);
+    } catch (err) {
+      if (err.message === 'no_data') {
+        missing = ch;
+        continue;
+      }
+      throw err;
+    }
+    if (!data) {
+      missing = ch;
+      continue;
+    }
+    header.push({ ch, unitIndex: 0 });
+    pinyinParts.push(data.pinyin || '');
+    wgParts.push(data.wg || '');
+    const box = { x: i * cell, y: y0, w: cell };
+    data.medians.forEach((median, si) => {
+      strokes.push({
+        median: median.map(([x, y]) => [box.x + (x / 1024) * cell, box.y + ((900 - y) / 1024) * cell]),
+        svgPath: data.strokes[si],
+        cell: box,
+      });
+    });
+  }
+
+  if (missing) throw Object.assign(new Error('no_data'), { char: missing });
+  if (!strokes.length) throw new Error('empty');
+
+  return {
+    units: [{ char: cellsChars.join(''), script: 'hanzi', composite: n, strokes }],
+    header,
+    pinyin: pinyinFromNumbered(item.pinyin || '').trim() || pinyinParts.join(' ').trim(),
+    wg: wgParts.join(' ').trim(),
+    meaning: item.meaning || '',
+  };
 }
 
 /** Break a mixed passage into practice tokens: Chinese characters and Latin words. */

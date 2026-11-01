@@ -88,8 +88,13 @@ function cleanSet(raw, index) {
   if (!raw) return null;
   const name = cleanText(raw.name, 40) || `Set ${index + 1}`;
   const langRaw = oneOf(raw.lang, ['zh', 'en', 'bm'], 'en');
-  const kind = oneOf(raw.kind, ['latin', 'chinese', 'passage'], langRaw === 'zh' ? 'chinese' : 'latin');
-  const lang = kind === 'chinese' ? 'zh' : langRaw === 'zh' ? 'en' : langRaw;
+  const kind = oneOf(
+    raw.kind,
+    ['latin', 'chinese', 'cizu', 'passage'],
+    langRaw === 'zh' ? 'chinese' : 'latin',
+  );
+  const isChinese = kind === 'chinese' || kind === 'cizu';
+  const lang = isChinese ? 'zh' : langRaw === 'zh' ? 'en' : langRaw;
   const repeat = kind === 'passage' ? 1 : int(raw.repeat, 1, 1, 10);
   const maxText = kind === 'passage' ? 2000 : 24;
   const items = [];
@@ -97,6 +102,13 @@ function cleanSet(raw, index) {
   for (const entry of Array.isArray(raw.items) ? raw.items.slice(0, 300) : []) {
     const item = cleanItem(entry, maxText);
     if (!item || seen.has(item.text)) continue;
+    // A 词组 keeps at most three characters so it fits one screen.
+    if (kind === 'cizu') {
+      const chars = Array.from(item.text).filter((ch) => ch.trim());
+      if (!chars.length) continue;
+      item.text = chars.slice(0, 3).join('');
+      if (seen.has(item.text)) continue;
+    }
     seen.add(item.text);
     items.push(item);
   }

@@ -3,6 +3,11 @@ import { drawWork } from './inkrender.js';
 const root = document.getElementById('results');
 const params = new URLSearchParams(location.search);
 const limit = Math.min(400, Math.max(1, Number(params.get('limit')) || 120));
+const SIZES = [100, 50, 25];
+const DRAW = { 100: 660, 50: 460, 25: 330 };
+let currentSize = Number(params.get('size')) || 50;
+if (!SIZES.includes(currentSize)) currentSize = 50;
+let rendered = null;
 
 const fmtDate = (ts) =>
   ts
@@ -24,6 +29,7 @@ function el(tag, attrs = {}, ...children) {
     if (value === null || value === undefined || value === false) continue;
     if (key === 'class') node.className = value;
     else if (key === 'text') node.textContent = value;
+    else if (key.startsWith('on') && typeof value === 'function') node[key] = value;
     else node.setAttribute(key, value);
   }
   for (const child of children.flat()) {
@@ -39,7 +45,7 @@ async function fetchJson(url) {
   return res.json();
 }
 
-function card(item) {
+function card(item, size = currentSize) {
   const canvas = el('canvas', { class: 'r-canvas' });
   const figure = el(
     'figure',
@@ -58,7 +64,7 @@ function card(item) {
       el('span', { class: 'r-set' }, item.setName || ''),
     ),
   );
-  drawWork(canvas, item, { size: 190 });
+  drawWork(canvas, item, { size: DRAW[size] });
   return figure;
 }
 
@@ -85,14 +91,40 @@ function renderPicker(students) {
   );
 }
 
+function setSize(size) {
+  if (!SIZES.includes(size) || !rendered) return;
+  currentSize = size;
+  params.set('size', String(size));
+  history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
+  renderStudent(rendered.student, rendered.work);
+}
+
 function renderStudent(student, work) {
+  rendered = { student, work };
   const dates = work.map((w) => w.ts).filter(Boolean);
   const from = dates.length ? fmtDay(Math.min(...dates)) : '';
   const to = dates.length ? fmtDay(Math.max(...dates)) : '';
   const range = from && to ? (from === to ? from : `${from} – ${to}`) : '';
 
-  const grid = el('div', { class: 'r-grid' });
-  for (const item of work) grid.append(card(item));
+  const grid = el('div', { class: `r-grid r-size-${currentSize}` });
+  for (const item of work) grid.append(card(item, currentSize));
+
+  const sizes = el(
+    'div',
+    { class: 'r-sizes', role: 'group', 'aria-label': 'Writing size' },
+    el('span', { class: 'r-sizes-label' }, 'Size'),
+    ...SIZES.map((size) =>
+      el(
+        'button',
+        {
+          class: `r-size-btn${size === currentSize ? ' active' : ''}`,
+          'aria-pressed': String(size === currentSize),
+          onclick: () => setSize(size),
+        },
+        `${size}%`,
+      ),
+    ),
+  );
 
   const head = el(
     'header',
@@ -112,6 +144,7 @@ function renderStudent(student, work) {
     el(
       'div',
       { class: 'r-actions' },
+      sizes,
       el('button', { class: 'r-btn', onclick: () => window.print(), text: 'Print' }),
       el('a', { class: 'r-btn ghost', href: '/results', text: 'All students' }),
       el('a', { class: 'r-btn ghost', href: '/admin#students', text: 'Parent page' }),

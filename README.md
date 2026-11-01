@@ -144,14 +144,14 @@ The word lists, settings and stroke guides are **shared**; each child keeps thei
 Every completed letter/character is stored as the child’s real ink:
 
 - **Parent page → Students → Review** shows thumbnails of the latest 60 exercises per child (score, time, set). Tap one to enlarge; the faint blue lines are the guide that was traced.
-- **Print / review page** (also `/results?student=<id>`) is a printable sheet: student name, date range, and a grid of their writing, three per row on A4. Use the browser’s **Print** to make a PDF or a paper copy.
+- **Print / review page** (also `/results?student=<id>`) is a printable sheet: student name, date range, and a grid of their writing. **Size 100 % / 50 % / 25 %** sets one, two or four writings per row (100 % also starts a new page for each). Use the browser’s **Print** to make a PDF or a paper copy.
 - New handwriting queues in the browser when offline and uploads automatically when the connection returns.
 
 ## The parent page (`/admin`)
 
 | Tab | What it does |
 | --- | --- |
-| **Word lists** | Add / rename / duplicate / delete lists. Choose **A Latin**, **B Chinese** or **C Mixed passage**, set the **repeat count**, and type one item per line. |
+| **Word lists** | Add / rename / duplicate / delete lists. Choose **A Latin**, **B Chinese**, **C 词组** or **D Mixed passage**, set the **repeat count**, and type one item per line. Manual pinyin goes in brackets: `早上 (zao3 shang)`. |
 | **Practice** | App title and UI language, **which modes are allowed** (checkboxes), grids, **practice box size**, guide visibility, ink thickness/colour, pinyin / Wade-Giles / meaning / stroke numbers, sound, **read aloud**, pencil-only. |
 | **Scoring** | Tolerance (gentle / normal / strict), pass mark per stroke, coaching tips. |
 | **Backup** | Export / import JSON (settings **and** this device’s practice history), reset to defaults, database / gist status. |
@@ -175,6 +175,8 @@ The generated guide already handles `p/q/r/u/a/b` with separate stem/bowl/arm st
 
 - **A · Latin words / phrases** practise **one letter at a time**; spaces and punctuation are skipped (`good morning` → g,o,o,d,m,o,r,n,i,n,g). Repeat runs the whole word again.
 - **B · Chinese words / phrases** practise **one character at a time** (`早上好` → 早, 上, 好). Pinyin, Wade-Giles and stroke data are added automatically.
+- **C · 词组 (ci zu)** puts **2–3 characters on one screen**, each in its own 田字格 cell (`早上` → both characters, written in order). Longer lines are cut to 3. Pinyin and Wade-Giles come from the characters, or from the manual pinyin below.
+- **Manual pinyin** — if the reading is wrong, type it in brackets after the word: `早上 (zǎo shang)` or `早上 (zao3 shang)` (tone numbers are converted to tone marks). Add a meaning after a pipe: `早上 (zǎo shang) | morning`.
 - **C · Mixed passages** are split into Chinese characters and Latin words; the current sentence stays visible above the practice box. Each word/character is scored and read aloud as it is finished, then the whole passage gets a summary. Repeat does not apply to passages.
 - **Passages wrap freely.** The whole text is one passage: line breaks (and blank lines between paragraphs) are just spaces, so every word is practised in the same run. To keep **several** passages in one set, put a line containing only `---` between them. (Only punctuation ends a sentence in the context bar.)
 - **Meaning** is optional: `cat | 猫 · kucing`.
