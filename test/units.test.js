@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parsePassage, isMixed, splitUnits, buildUnits } from '../public/js/units.js';
+import { pathLength } from '../public/js/scoring.js';
 import { isPunctuation, punctuationStrokes } from '../public/js/punctuation.js';
 
 test('passage splits Chinese characters and Latin words', () => {
@@ -96,7 +97,7 @@ test('punctuation can be practised with the passage option', () => {
 });
 
 test('every punctuation mark has a guide', () => {
-  for (const mark of ['，', '。', '！', '？', '、', '：', '；', '“', '”', '（', '）', '《', '》', '…', '—']) {
+  for (const mark of ['，', '。', '！', '？', '、', '：', '；', '“', '”', '（', '）', '《', '》', '…', '—', '.', ',', '!', '?', ';', ':', '"', '-']) {
     assert.equal(isPunctuation(mark), true, mark);
     const strokes = punctuationStrokes(mark);
     assert.ok(strokes && strokes.length >= 1, mark);
@@ -114,5 +115,14 @@ test('a punctuation unit is built without hanzi data', async () => {
   assert.equal(built.units.length, 1);
   assert.equal(built.units[0].punctuation, true);
   assert.equal(built.units[0].strokes.length, 1);
-  assert.deepEqual(built.units[0].strokes[0].median, [[0.38, 0.72]]);
+  // the Chinese full stop is a hollow circle, not a tap
+  const circle = built.units[0].strokes[0].median;
+  assert.ok(circle.length > 10, 'circle has many points');
+  assert.ok(pathLength(circle) > 0.3, 'circle has a circumference');
+});
+
+test('the English period is still a tap', async () => {
+  const built = await buildUnits({ text: '.', punctuation: true }, 'en');
+  assert.equal(built.units[0].strokes.length, 1);
+  assert.equal(built.units[0].strokes[0].median.length, 1);
 });

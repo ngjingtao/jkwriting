@@ -182,7 +182,7 @@ The generated guide already handles `p/q/r/u/a/b` with separate stem/bowl/arm st
 - **C · Mixed passages** are split into Chinese characters and Latin words; the current sentence stays visible above the practice box. Each word/character is scored and read aloud as it is finished, then the whole passage gets a summary. Repeat does not apply to passages.
 - **Passages wrap freely.** The whole text is one passage: line breaks (and blank lines between paragraphs) are just spaces, so every word is practised in the same run. To keep **several** passages in one set, put a line containing only `---` between them. (Only punctuation ends a sentence in the context bar.)
 - **Pinyin inside a passage**: write it in brackets after a run of characters, one syllable per character — `星期天 (xing1 qi1 tian1)，炯恪 (jiong3 ke4) 去玩。` Tone numbers or tone marks both work, and characters without an annotation keep the automatic pinyin.
-- **Punctuation (标点符号)**: off by default — punctuation is shown but not written. Turn on **Practice → Practise punctuation** to make ，。！？、：；“”（）《》… part of the passage, each with a simple guide (a full stop is a tap).
+- **Punctuation (标点符号)**: off by default — punctuation is shown but not written. Turn on **Practice → Practise punctuation** to make ，。！？、：；“”（）《》… part of the passage. Each mark has a guide matching how it is written: the Chinese full stop **。 is a small hollow circle**, the English period **. is a tap**, the comma a hook, and so on.
 - **Meaning** is optional: `cat | 猫 · kucing`.
 - Letters and digits are supported: `a–z`, `A–Z`, `0–9`.
 - Duplicate lines in a list are dropped on save.
