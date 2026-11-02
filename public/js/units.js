@@ -159,17 +159,42 @@ async function buildCizu(item, chars) {
 }
 
 /** Break a mixed passage into practice tokens: Chinese characters and Latin words. */
+/**
+ * Pull `星期天 (xing1 qi1 tian1)` annotations out of a passage.
+ * One syllable per character; annotations that do not match are dropped.
+ */
+export function extractPassagePinyin(text) {
+  const pinyin = new Map();
+  const clean = String(text).replace(
+    /([\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]+)\s*\(([^()]+)\)/g,
+    (whole, chars, raw) => {
+      const syllables = pinyinFromNumbered(raw.trim()).split(/\s+/).filter(Boolean);
+      const list = Array.from(chars);
+      if (syllables.length === list.length) {
+        list.forEach((ch, i) => {
+          if (!pinyin.has(ch)) pinyin.set(ch, syllables[i]);
+        });
+      }
+      return chars;
+    },
+  );
+  return { text: clean, pinyin };
+}
+
 export function parsePassage(text, latinLang = 'en') {
+  const { text: clean, pinyin } = extractPassagePinyin(text);
   const tokens = [];
-  for (const sentence of splitSentences(text)) {
+  for (const sentence of splitSentences(clean)) {
     const re = /[\u3400-\u9fff]|[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*/g;
     let match;
     while ((match = re.exec(sentence))) {
       const value = match[0];
+      const isHan = CJK_CHAR.test(value);
       tokens.push({
         text: value,
-        lang: CJK_CHAR.test(value) ? 'zh' : latinLang,
+        lang: isHan ? 'zh' : latinLang,
         sentence,
+        pinyin: isHan ? pinyin.get(value) || '' : '',
       });
     }
   }

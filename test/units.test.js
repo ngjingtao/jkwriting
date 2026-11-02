@@ -62,3 +62,25 @@ test('a wrapped mixed passage keeps every unit', () => {
     ['Good', 'morning', '早', '上', '好', 'I', 'brush', 'my', 'teeth'],
   );
 });
+
+test('pinyin annotations in a passage are attached per character', () => {
+  const tokens = parsePassage('星期天 (xing1 qi1 tian1)，炯恪 (jiong3 ke4) 去玩。', 'zh');
+  const map = Object.fromEntries(tokens.map((t) => [t.text, t.pinyin]));
+  assert.equal(map['星'], 'xīng');
+  assert.equal(map['期'], 'qī');
+  assert.equal(map['天'], 'tiān');
+  assert.equal(map['炯'], 'jiǒng');
+  assert.equal(map['恪'], 'kè');
+  assert.equal(map['去'], '');
+});
+
+test('the context sentence hides the pinyin annotations', () => {
+  const [first] = parsePassage('星期天 (xing1 qi1 tian1) 去玩。', 'zh');
+  assert.equal(first.sentence, '星期天 去玩。');
+});
+
+test('a mismatched annotation is dropped, not shown', () => {
+  const tokens = parsePassage('早上 (zao) 好。', 'zh');
+  assert.equal(tokens[0].sentence, '早上 好。');
+  assert.equal(tokens[0].pinyin, '');
+});

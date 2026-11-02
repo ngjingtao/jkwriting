@@ -800,7 +800,7 @@ function setsTab() {
         : current.kind === 'cizu'
           ? 'One 词组 per line — 2 or 3 characters written together on one screen. Type the pinyin in brackets if the automatic reading is wrong: 早上 (zǎo shang) | morning.'
           : current.kind === 'passage'
-            ? 'The whole text is one passage — line breaks and blank lines stay inside it, so every word is practised in the same run. Chinese and Latin can be mixed. To keep several passages in one list, put a line with --- between them.'
+            ? 'The whole text is one passage — line breaks and blank lines stay inside it, so every word is practised in the same run. Chinese and Latin can be mixed. Fix a reading by adding pinyin after the characters, one syllable per character: 星期天 (xing1 qi1 tian1). To keep several passages in one list, put a line with --- between them.'
             : 'One word or phrase per line. Practised letter by letter.';
 
     right = h(
