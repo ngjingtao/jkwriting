@@ -155,3 +155,40 @@ test('work is kept per student', async () => {
     assert.equal((await work.listWork(a.id)).work[0].unit, 'a');
   });
 });
+
+test('work is grouped by session for a passage', async () => {
+  await withDb(async () => {
+    const student = await students.addStudent('Session Kid');
+    const session = 'abc123-session';
+    for (const [i, unit] of ['星', '期', '天'].entries()) {
+      await work.saveWork({
+        student: student.id,
+        session,
+        ts: 1000 + i,
+        token: unit,
+        unit,
+        kind: 'passage',
+        strokes: [stroke],
+      });
+    }
+    await work.saveWork({
+      student: student.id,
+      ts: 2000,
+      token: 'cat',
+      unit: 'c',
+      kind: 'latin',
+      strokes: [stroke],
+    });
+
+    const all = await work.listWork(student.id);
+    assert.equal(all.work.length, 4);
+    assert.equal(all.work.filter((w) => w.session === session).length, 3);
+
+    const one = await work.listWork(student.id, 400, null, session);
+    assert.equal(one.work.length, 3);
+    assert.deepEqual(
+      one.work.map((w) => w.unit).sort(),
+      ['天', '星', '期'].sort(),
+    );
+  });
+});

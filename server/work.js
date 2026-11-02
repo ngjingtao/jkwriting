@@ -44,9 +44,13 @@ export function cleanWork(raw) {
 
   const ts = Math.round(Number(raw.ts)) || Date.now();
   const guide = cleanStrokes(raw.guide);
+  const session = /^[a-z0-9-]{6,40}$/i.test(String(raw.session || ''))
+    ? String(raw.session)
+    : null;
 
   return {
     student,
+    session,
     ts: Math.min(Date.now() + 86400000, Math.max(0, ts)),
     token: cleanText(raw.token, 80) || '—',
     unit: cleanText(raw.unit, 16) || '?',
@@ -70,10 +74,16 @@ export async function saveWork(raw) {
   return { stored: true, db: true, id };
 }
 
-export async function listWork(student, limit = 60, before = null) {
+export async function listWork(student, limit = 60, before = null, session = null) {
   if (!isStudentId(student)) throw Object.assign(new Error('bad_student'), { status: 400 });
   if (!dbState.enabled) return { stored: false, db: false, work: [] };
-  const rows = await dbListWork(student, Math.min(200, Math.max(1, Number(limit) || 60)), before);
+  const cleanSession = /^[a-z0-9-]{6,40}$/i.test(String(session || '')) ? String(session) : null;
+  const rows = await dbListWork(
+    student,
+    Math.min(400, Math.max(1, Number(limit) || 60)),
+    before,
+    cleanSession,
+  );
   return { stored: true, db: true, work: rows };
 }
 

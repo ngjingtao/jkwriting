@@ -106,8 +106,63 @@ function renderStudent(student, work) {
   const to = dates.length ? fmtDay(Math.max(...dates)) : '';
   const range = from && to ? (from === to ? from : `${from} – ${to}`) : '';
 
+  const bySession = new Map();
+  for (const item of work) {
+    if (!item.session) continue;
+    if (!bySession.has(item.session)) bySession.set(item.session, []);
+    bySession.get(item.session).push(item);
+  }
+  const whole = [...bySession.entries()]
+    .filter(([, items]) => items.length > 1 && items.some((i) => i.kind === 'passage'))
+    .map(([id, items]) => ({ id, items: items.slice().sort((a, b) => a.ts - b.ts) }));
+  const wholeIds = new Set(whole.map((w) => w.id));
+
+  const wholeSection = whole.length
+    ? el(
+        'section',
+        { class: 'r-whole' },
+        el('h2', {}, 'Whole passages'),
+        el(
+          'div',
+          { class: 'r-whole-list' },
+          ...whole.map((group) => {
+            const strip = el('div', { class: 'r-whole-strip' });
+            for (const item of group.items.slice(0, 5)) {
+              const canvas = el('canvas');
+              drawWork(canvas, item, { size: 90, guide: false });
+              strip.append(canvas);
+            }
+            const avg = Math.round(
+              group.items.reduce((sum, i) => sum + (i.pct || 0), 0) / group.items.length,
+            );
+            return el(
+              'a',
+              {
+                class: 'r-whole-card',
+                href: `/passage?student=${encodeURIComponent(student.id)}&session=${encodeURIComponent(group.id)}`,
+              },
+              strip,
+              el(
+                'span',
+                { class: 'r-whole-info' },
+                el('span', { class: 'r-whole-title' }, group.items[0].setName || 'Passage'),
+                el(
+                  'span',
+                  { class: 'r-whole-meta' },
+                  `${group.items.length} characters · ${avg}% · ${fmtDate(group.items[group.items.length - 1].ts)}`,
+                ),
+                el('span', { class: 'r-whole-open' }, 'Open the whole passage →'),
+              ),
+            );
+          }),
+        ),
+      )
+    : null;
+
+  const singles = work.filter((item) => !item.session || !wholeIds.has(item.session));
+
   const grid = el('div', { class: `r-grid r-size-${currentSize}` });
-  for (const item of work) grid.append(card(item, currentSize));
+  for (const item of singles) grid.append(card(item, currentSize));
 
   const sizes = el(
     'div',
@@ -152,7 +207,7 @@ function renderStudent(student, work) {
   );
 
   const body = work.length
-    ? grid
+    ? el('div', {}, wholeSection, grid)
     : el('div', { class: 'r-empty' }, 'No handwriting saved for this student yet.');
 
   root.replaceChildren(

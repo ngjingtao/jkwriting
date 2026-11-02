@@ -511,6 +511,46 @@ function studentsTab() {
       grid.append(h('div', { class: 'empty' }, 'No handwriting yet — finish a letter in the app.'));
       return;
     }
+    const bySession = new Map();
+    for (const item of work) {
+      if (!item.session) continue;
+      if (!bySession.has(item.session)) bySession.set(item.session, []);
+      bySession.get(item.session).push(item);
+    }
+    const passages = [...bySession.entries()].filter(
+      ([, items]) => items.length > 1 && items.some((i) => i.kind === 'passage'),
+    );
+
+    const panel = grid.parentElement;
+    panel?.querySelector('.work-sessions')?.remove();
+    if (panel && passages.length) {
+      const box = h(
+        'div',
+        { class: 'work-sessions' },
+        h('h4', {}, 'Whole passages'),
+        ...passages.map(([id, items]) => {
+          const ordered = items.slice().sort((a, b) => a.ts - b.ts);
+          return h(
+            'a',
+            {
+              class: 'work-session',
+              href: `/passage?student=${encodeURIComponent(student.id)}&session=${encodeURIComponent(id)}`,
+              target: '_blank',
+              rel: 'noopener',
+            },
+            h('span', { class: 'ws-name' }, ordered[0].setName || 'Passage'),
+            h(
+              'span',
+              { class: 'ws-meta' },
+              `${ordered.length} characters · ${shortDate(ordered[ordered.length - 1].ts)}`,
+            ),
+            h('span', { class: 'ws-open' }, 'Open / print →'),
+          );
+        }),
+      );
+      panel.insertBefore(box, grid);
+    }
+
     for (const item of work) {
       const canvas = h('canvas', { class: 'work-canvas' });
       const card = h(

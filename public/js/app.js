@@ -13,6 +13,7 @@ import {
   studentName,
 } from './students.js';
 import { initWorkSync } from './work.js';
+import { loadSession, clearSession, sessionFor } from './session.js';
 import { setSound } from './sound.js';
 import { setSpeechEnabled } from './speech.js';
 
@@ -277,7 +278,7 @@ function openSet(set) {
           class: `word-chip${set.kind === 'passage' ? ' passage' : ''}`,
           onclick: () => {
             sheet.close();
-            startPractice(item, set, index, set.lang, set.kind);
+            requestPractice(item, set, index, set.lang, set.kind);
           },
         },
         h('span', { class: 'wc-text' }, item.text),
@@ -297,7 +298,7 @@ function openSet(set) {
         onclick: () => {
           const index = Math.floor(Math.random() * set.items.length);
           sheet.close();
-          startPractice(set.items[index], set, index, set.lang, set.kind);
+          requestPractice(set.items[index], set, index, set.lang, set.kind);
         },
       },
       icon('sparkle'),
@@ -314,7 +315,56 @@ function openSet(set) {
   sheet.close = opened.close;
 }
 
-function startPractice(item, set, index, lang, kind) {
+function requestPractice(item, set, index, lang, kind, resumed = null) {
+  if (resumed) {
+    startPractice(item, set, index, lang, kind, resumed);
+    return;
+  }
+  const session = loadSession();
+  const resolvedKind = kind || set?.kind || (lang === 'zh' ? 'chinese' : 'latin');
+  if (sessionFor(session, { set, item }) && session.kind === resolvedKind) {
+    const total = session.totalTokens || 0;
+    const done = Math.min(total, (session.completed || []).length);
+    const body = h(
+      'div',
+      {},
+      h('p', { class: 'resume-info' }, `${done} of ${total} written · ${set?.name || ''}`),
+      h(
+        'button',
+        {
+          class: 'btn primary block',
+          onclick: () => {
+            sheet.close();
+            startPractice(item, set, index, lang, kind, session);
+          },
+        },
+        'Resume',
+      ),
+      h(
+        'button',
+        {
+          class: 'btn ghost block',
+          style: { marginTop: '8px' },
+          onclick: () => {
+            clearSession();
+            sheet.close();
+            startPractice(item, set, index, lang, kind);
+          },
+        },
+        'Start over',
+      ),
+    );
+    const sheet = openSheet({
+      title: 'Continue where you stopped?',
+      sub: `${item.text.slice(0, 48)}${item.text.length > 48 ? '…' : ''}`,
+      body,
+    });
+    return;
+  }
+  startPractice(item, set, index, lang, kind);
+}
+
+function startPractice(item, set, index, lang, kind, resume = null) {
   const settings = getSettings(state.config);
   if (state.practice) state.practice.destroy();
   clear(app);
@@ -328,6 +378,7 @@ function startPractice(item, set, index, lang, kind) {
     lang,
     kind: resolvedKind,
     setName: set?.name || '',
+    resume,
     onExit: () => {
       practice.destroy();
       state.practice = null;

@@ -279,3 +279,78 @@
     border: 1px solid #eee8dd;
   }
 }
+
+/* Whole-passage links at the top of the review page */
+
+.r-whole {
+  margin-bottom: 20px;
+}
+
+.r-whole h2 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+}
+
+.r-whole-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  gap: 10px;
+}
+
+.r-whole-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid #e7e1d6;
+  border-radius: 14px;
+  background: #fff;
+  color: inherit;
+  text-decoration: none;
+}
+
+.r-whole-strip {
+  display: flex;
+  gap: 3px;
+  flex: none;
+}
+
+.r-whole-strip canvas {
+  width: 42px;
+  height: 42px;
+  border-radius: 6px;
+  border: 1px solid #eee8dd;
+}
+
+.r-whole-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.r-whole-title {
+  font-weight: 800;
+  font-size: 13.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.r-whole-meta {
+  font-size: 11.5px;
+  color: #8b8378;
+}
+
+.r-whole-open {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #4f46e5;
+}
+
+@media print {
+  .r-whole {
+    display: none;
+  }
+}

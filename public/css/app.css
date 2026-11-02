@@ -1538,3 +1538,10 @@ p {
   color: var(--brand);
   font-weight: 800;
 }
+
+.resume-info {
+  margin: 0 0 14px;
+  font-size: 13.5px;
+  color: var(--muted);
+  font-weight: 650;
+}

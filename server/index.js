@@ -128,7 +128,14 @@ app.get('/api/work', async (req, res, next) => {
   try {
     res.setHeader('Cache-Control', 'no-store');
     const before = req.query.before === undefined ? null : Number(req.query.before);
-    res.json(await listWork(String(req.query.student || ''), req.query.limit, before));
+    res.json(
+      await listWork(
+        String(req.query.student || ''),
+        req.query.limit,
+        before,
+        req.query.session ? String(req.query.session) : null,
+      ),
+    );
   } catch (err) {
     sendError(res, err, next);
   }
@@ -226,6 +233,7 @@ app.get('/api/admin/status', requireAdmin, (req, res) => {
 app.get('/admin', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'admin.html')));
 app.get('/strokes', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'strokes.html')));
 app.get('/results', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'results.html')));
+app.get('/passage', (req, res) => res.sendFile(path.join(PUBLIC_DIR, 'passage.html')));
 
 app.use(
   express.static(PUBLIC_DIR, {

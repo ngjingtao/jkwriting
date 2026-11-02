@@ -17,12 +17,13 @@ import { speak, primeSpeech, setSpeechEnabled, voiceLang } from './speech.js';
 import { addEntry } from './history.js';
 import { currentStudentId } from './students.js';
 import { queueWork } from './work.js';
+import { saveSession, loadSession, clearSession } from './session.js';
 import { setOverride, clearOverrides } from './settings.js';
 
 const MODES = ['trace', 'copy', 'memory'];
 
 export class Practice {
-  constructor({ config, settings, item, set, lang, kind, setName, onExit, onNext }) {
+  constructor({ config, settings, item, set, lang, kind, setName, onExit, onNext, resume = null }) {
     this.config = config;
     this.settings = { ...settings };
     this.item = item;
@@ -58,6 +59,11 @@ export class Practice {
     this._recorded = false;
     this._tokenDone = -1;
     this._pendingAdvance = 0;
+    this.resume = resume;
+    this._finished = false;
+    this.sessionId =
+      globalThis.crypto?.randomUUID?.() ||
+      `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   }
 
   async mount() {
@@ -75,6 +81,10 @@ export class Practice {
       gridLatin: this.settings.gridLatin,
       penOnly: this.settings.penOnly,
     });
+    this._onVisibility = () => {
+      if (document.visibilityState === 'hidden') this._saveSession();
+    };
+    document.addEventListener('visibilitychange', this._onVisibility);
     this.surface.onStrokeStart = () => {
       this.hintEl.classList.remove('show');
     };
@@ -102,6 +112,7 @@ export class Practice {
     this._resultWrap?.remove();
     this._resultWrap = null;
     this._resultCleanup = null;
+    document.removeEventListener('visibilitychange', this._onVisibility);
     this.surface?.destroy();
     this.root?.remove();
   }
@@ -126,7 +137,14 @@ export class Practice {
 
     const backBtn = h(
       'button',
-      { class: 'icon-btn', 'aria-label': t('practice.back'), onclick: () => this.onExit?.() },
+      {
+        class: 'icon-btn',
+        'aria-label': t('practice.back'),
+        onclick: () => {
+          this._saveSession();
+          this.onExit?.();
+        },
+      },
       icon('back'),
     );
 
@@ -255,9 +273,56 @@ export class Practice {
       ];
     }
     if (!this.tokens.length) throw new Error('empty');
-    this._prefetchFrom(0);
-    await this._startToken(0);
+    const start = this.resume ? Math.min(this.resume.tokenIndex || 0, this.tokens.length - 1) : 0;
+    this._prefetchFrom(start);
+    await this._startToken(start);
+    if (this.resume) this._restoreSession(this.resume);
     this._loading(false);
+  }
+
+  _restoreSession(session) {
+    this.resume = null;
+    if (Array.isArray(session.completed)) this.completed = session.completed;
+    if (Array.isArray(session.results)) this.results = session.results;
+    if (session.mode && this.allowedModes.includes(session.mode)) {
+      this.mode = session.mode;
+      for (const button of this.modeRow?.children || []) {
+        button.setAttribute('aria-pressed', String(button.dataset.mode === this.mode));
+      }
+    }
+    this.round = session.round || 1;
+    this.index = Math.min(this.units.length - 1, Math.max(0, session.unitIndex || 0));
+    this._startUnit();
+  }
+
+  _saveSession() {
+    if (this._destroyed || this._finished || !this.tokens.length) return;
+    saveSession({
+      setId: this.set?.id || '',
+      itemText: this.item?.text || '',
+      name: this.setName || '',
+      kind: this.kind,
+      mode: this.mode,
+      round: this.round,
+      // A token that has just been completed may still be waiting to advance.
+      tokenIndex: Math.min(
+        this.tokens.length - 1,
+        Math.max(this.tokenIndex, this.kind === 'passage' ? this.completed.length : this.tokenIndex),
+      ),
+      unitIndex: this.index,
+      totalTokens: this.tokens.length,
+      results: this.results.filter(Boolean),
+      completed: this.completed,
+      done: false,
+    });
+  }
+
+  _finishSession() {
+    this._finished = true;
+    const saved = loadSession();
+    if (saved && saved.setId === (this.set?.id || '') && saved.itemText === (this.item?.text || '')) {
+      clearSession();
+    }
   }
 
   _prefetchFrom(index) {
@@ -479,6 +544,7 @@ export class Practice {
     if (!strokes.length) return;
     queueWork({
       student: currentStudentId(),
+      session: this.sessionId,
       ts: Date.now(),
       token: this.tokens?.[this.tokenIndex]?.text || this.item?.text || unit.char,
       unit: unit.char,
@@ -692,6 +758,7 @@ export class Practice {
 
   _showWordResult() {
     if (this._resultCleanup) return;
+    this._finishSession();
     const t = this.t;
     const stats = this._wordStats();
     const isPassage = this.kind === 'passage';

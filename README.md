@@ -145,7 +145,9 @@ Every completed letter/character is stored as the child’s real ink:
 
 - **Parent page → Students → Review** shows thumbnails of the latest 60 exercises per child (score, time, set). Tap one to enlarge; the faint blue lines are the guide that was traced.
 - **Print / review page** (also `/results?student=<id>`) is a printable sheet: student name, date range, and a grid of their writing. **Size 100 % / 50 % / 25 %** sets one, two or four writings per row (100 % also starts a new page for each). Use the browser’s **Print** to make a PDF or a paper copy.
+- **Whole passages**: a passage written in one run is grouped under **Whole passages** (top of the review page and in the Students tab). Open it for a sheet with every character the child wrote, in order, plus the text assembled from their writing — ready to print or save as PDF (`/passage?student=<id>&session=<id>`).
 - New handwriting queues in the browser when offline and uploads automatically when the connection returns.
+- **Back is safe**: leaving a passage (back button, switching apps, closing the tab) saves the place; opening the same passage again offers **Resume** or **Start over**. A finished passage clears the saved place.
 
 ## The parent page (`/admin`)
 
@@ -254,6 +256,8 @@ public/
     work.js       Offline queue for finished handwriting
     inkrender.js  Draws saved handwriting into a canvas
     results.js    Printable review page per student
+    passage.js    One sheet with a whole passage's handwriting
+    session.js    Remembers where a child stopped
     sound.js      WebAudio feedback
   css/
   icons/          Generated app icons

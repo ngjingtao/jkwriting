@@ -117,7 +117,9 @@ const SCHEMA = [
      guide jsonb,
      created_at timestamptz not null default now()
    )`,
+  `alter table wf_work add column if not exists session text`,
   `create index if not exists wf_work_student_ts_idx on wf_work (student, ts desc)`,
+  `create index if not exists wf_work_session_idx on wf_work (session)`,
 ];
 
 /** Connect and create the tables. Safe to call repeatedly. */
@@ -259,11 +261,12 @@ export async function dbDeleteStudent(id) {
 
 export async function dbSaveWork(work, limit = WORK_LIMIT) {
   const { rows } = await q(
-    `insert into wf_work (student, ts, token, unit, set_name, lang, kind, pct, stars, strokes, guide)
-     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb)
+    `insert into wf_work (student, session, ts, token, unit, set_name, lang, kind, pct, stars, strokes, guide)
+     values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb)
      returning id`,
     [
       work.student,
+      work.session || null,
       work.ts,
       work.token,
       work.unit,
@@ -287,15 +290,19 @@ export async function dbSaveWork(work, limit = WORK_LIMIT) {
   return rows[0]?.id || null;
 }
 
-export async function dbListWork(student, limit = 60, before = null) {
+export async function dbListWork(student, limit = 60, before = null, session = null) {
   const params = [student, limit];
   let where = 'student = $1';
   if (Number.isFinite(before)) {
     params.push(before);
-    where += ' and ts < $3';
+    where += ` and ts < $${params.length}`;
+  }
+  if (session) {
+    params.push(session);
+    where += ` and session = $${params.length}`;
   }
   const { rows } = await q(
-    `select id, ts, token, unit, set_name, lang, kind, pct, stars, strokes, guide
+    `select id, session, ts, token, unit, set_name, lang, kind, pct, stars, strokes, guide
        from wf_work
       where ${where}
       order by ts desc
@@ -304,6 +311,7 @@ export async function dbListWork(student, limit = 60, before = null) {
   );
   return rows.map((row) => ({
     id: Number(row.id),
+    session: row.session || null,
     ts: Number(row.ts),
     token: row.token,
     unit: row.unit,
