@@ -1,5 +1,6 @@
 import { fittedLatinStrokes, ensureLatinFont } from './fontfit.js';
 import { pinyinFromNumbered } from './pinyin.js';
+import { isPunctuation, punctuationStrokes, PUNCTUATION_CLASS } from './punctuation.js';
 import { fetchHanzi } from './api.js';
 
 const CJK = /[\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
@@ -22,6 +23,24 @@ export async function buildUnits(item, lang) {
 
   const units = [];
   const header = [];
+
+  if (item.punctuation && isPunctuation(item.text)) {
+    const medians = punctuationStrokes(item.text) || [];
+    return {
+      units: [
+        {
+          char: item.text,
+          script: 'hanzi',
+          punctuation: true,
+          strokes: medians.map((median) => ({ median, svgPath: null })),
+        },
+      ],
+      header: [{ ch: item.text, unitIndex: 0 }],
+      pinyin: '',
+      wg: '',
+      meaning: '',
+    };
+  }
 
   if (item.kind === 'cizu') return buildCizu(item, chars);
 
@@ -181,19 +200,22 @@ export function extractPassagePinyin(text) {
   return { text: clean, pinyin };
 }
 
-export function parsePassage(text, latinLang = 'en') {
+export function parsePassage(text, latinLang = 'en', options = {}) {
   const { text: clean, pinyin } = extractPassagePinyin(text);
   const tokens = [];
+  const words = `[\\u3400-\\u9fff]|${options.punctuation ? PUNCTUATION_CLASS + '|' : ''}[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*`;
   for (const sentence of splitSentences(clean)) {
-    const re = /[\u3400-\u9fff]|[A-Za-z0-9]+(?:['’][A-Za-z0-9]+)*/g;
+    const re = new RegExp(words, 'g');
     let match;
     while ((match = re.exec(sentence))) {
       const value = match[0];
+      const mark = isPunctuation(value);
       const isHan = CJK_CHAR.test(value);
       tokens.push({
         text: value,
-        lang: isHan ? 'zh' : latinLang,
+        lang: isHan || mark ? 'zh' : latinLang,
         sentence,
+        punctuation: mark,
         pinyin: isHan ? pinyin.get(value) || '' : '',
       });
     }

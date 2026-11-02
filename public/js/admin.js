@@ -1132,6 +1132,15 @@ function practiceTab() {
       p.penOnly = v;
       markDirty();
     }),
+    switchRow(
+      'Practise punctuation (标点符号)',
+      'In passages, also write ，。！？、：；“”（）《》… — each mark gets a simple guide. Off by default.',
+      Boolean(p.punctuation),
+      (v) => {
+        p.punctuation = v;
+        markDirty();
+      },
+    ),
   );
   return panel;
 }

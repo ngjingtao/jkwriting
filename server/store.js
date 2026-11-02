@@ -183,6 +183,7 @@ export function sanitizeConfig(raw) {
       sound: bool(practice.sound, base.practice.sound),
       speakOnComplete: bool(practice.speakOnComplete, base.practice.speakOnComplete),
       penOnly: bool(practice.penOnly, base.practice.penOnly),
+      punctuation: bool(practice.punctuation, base.practice.punctuation),
     },
     scoring: {
       tolerance: oneOf(scoring.tolerance, ['lenient', 'normal', 'strict'], base.scoring.tolerance),

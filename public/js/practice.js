@@ -240,7 +240,9 @@ export class Practice {
   async _load() {
     this._loading(true);
     if (this.kind === 'passage') {
-      this.tokens = parsePassage(this.item.text, this.lang === 'zh' ? 'en' : this.lang);
+      this.tokens = parsePassage(this.item.text, this.lang === 'zh' ? 'en' : this.lang, {
+        punctuation: Boolean(this.settings.punctuation),
+      });
     } else {
       this.tokens = [
         {
@@ -292,7 +294,13 @@ export class Practice {
     let built;
     try {
       built = await buildUnits(
-        { text: token.text, meaning: token.meaning, pinyin: token.pinyin, kind: this.kind },
+        {
+          text: token.text,
+          meaning: token.meaning,
+          pinyin: token.pinyin,
+          kind: this.kind,
+          punctuation: token.punctuation,
+        },
         token.lang,
       );
     } catch (err) {

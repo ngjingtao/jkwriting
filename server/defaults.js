@@ -32,6 +32,7 @@ export const DEFAULT_CONFIG = {
     sound: true,
     speakOnComplete: true,
     penOnly: false,
+    punctuation: false, // practise 标点符号 in passages
   },
   scoring: {
     tolerance: 'normal', // lenient | normal | strict

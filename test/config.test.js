@@ -106,3 +106,8 @@ test('manual pinyin survives validation', () => {
     meaning: 'morning',
   });
 });
+
+test('punctuation practice is off by default and can be enabled', () => {
+  assert.equal(sanitizeConfig({}).practice.punctuation, false);
+  assert.equal(sanitizeConfig({ practice: { punctuation: true } }).practice.punctuation, true);
+});

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parsePassage, isMixed, splitUnits } from '../public/js/units.js';
+import { parsePassage, isMixed, splitUnits, buildUnits } from '../public/js/units.js';
+import { isPunctuation, punctuationStrokes } from '../public/js/punctuation.js';
 
 test('passage splits Chinese characters and Latin words', () => {
   const tokens = parsePassage('Good morning! 早上好！I brush my teeth. 我刷牙。', 'en');
@@ -83,4 +84,35 @@ test('a mismatched annotation is dropped, not shown', () => {
   const tokens = parsePassage('早上 (zao) 好。', 'zh');
   assert.equal(tokens[0].sentence, '早上 好。');
   assert.equal(tokens[0].pinyin, '');
+});
+
+test('punctuation can be practised with the passage option', () => {
+  const off = parsePassage('好。', 'zh');
+  const on = parsePassage('好。', 'zh', { punctuation: true });
+  assert.deepEqual(off.map((t) => t.text), ['好']);
+  assert.deepEqual(on.map((t) => t.text), ['好', '。']);
+  assert.equal(on[1].punctuation, true);
+  assert.equal(on[1].lang, 'zh');
+});
+
+test('every punctuation mark has a guide', () => {
+  for (const mark of ['，', '。', '！', '？', '、', '：', '；', '“', '”', '（', '）', '《', '》', '…', '—']) {
+    assert.equal(isPunctuation(mark), true, mark);
+    const strokes = punctuationStrokes(mark);
+    assert.ok(strokes && strokes.length >= 1, mark);
+    for (const stroke of strokes) {
+      assert.ok(stroke.length >= 1, mark);
+      for (const [x, y] of stroke) {
+        assert.ok(x >= 0 && x <= 1 && y >= 0 && y <= 1, mark);
+      }
+    }
+  }
+});
+
+test('a punctuation unit is built without hanzi data', async () => {
+  const built = await buildUnits({ text: '。', punctuation: true }, 'zh');
+  assert.equal(built.units.length, 1);
+  assert.equal(built.units[0].punctuation, true);
+  assert.equal(built.units[0].strokes.length, 1);
+  assert.deepEqual(built.units[0].strokes[0].median, [[0.38, 0.72]]);
 });

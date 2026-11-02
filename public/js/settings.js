@@ -61,6 +61,7 @@ export function getSettings(config) {
     sound: config.practice.sound,
     speakOnComplete: config.practice.speakOnComplete,
     penOnly: config.practice.penOnly,
+    punctuation: config.practice.punctuation === true,
     uiLang: config.app.uiLang,
     tolerance: config.scoring.tolerance,
     threshold: config.scoring.threshold,
