@@ -1,5 +1,5 @@
 import { drawWork } from './inkrender.js';
-import { downloadDocx, exportCharactersZip, exportPdf, EXPORT_SIZES } from './passage-export.js';
+import { downloadDocx, exportCharactersZip, exportPdf, exportRtf, EXPORT_SIZES } from './passage-export.js';
 
 const root = document.getElementById('passage');
 const params = new URLSearchParams(location.search);
@@ -101,6 +101,11 @@ function render(student, work) {
         class: 'r-btn ghost',
         onclick: () => downloadDocx(student, work, sizeSelect.value),
         text: 'Word (.docx)',
+      }),
+      el('button', {
+        class: 'r-btn ghost',
+        onclick: () => exportRtf(student, work, sizeSelect.value),
+        text: 'Word (.rtf)',
       }),
       el('button', {
         class: 'r-btn ghost',

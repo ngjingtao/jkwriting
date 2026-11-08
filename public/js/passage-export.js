@@ -137,15 +137,15 @@ export async function downloadDocx(student, work, sizeKey = 'md') {
   const children = [];
   for (let i = 0; i < pages.length; i += 1) {
     const canvas = pages[i];
-    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    const bytes = new Uint8Array(await blob.arrayBuffer());
+    // JPEG pages are the most Word-friendly thing to embed.
+    const bytes = dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92));
     const width = 700; // 18.5 cm at 96 dpi
     children.push(
       new Paragraph({
         spacing: { before: 0, after: 0 },
         children: [
           new ImageRun({
-            type: 'png',
+            type: 'jpg',
             data: bytes,
             transformation: { width, height: Math.round((width * canvas.height) / canvas.width) },
           }),
@@ -262,4 +262,54 @@ export async function exportPdf(student, work, sizeKey = 'md') {
     .replace(/[^a-z0-9.\-]+/gi, '-')
     .replace(/-+/g, '-');
   saveBlob(new Blob([bytes], { type: 'application/pdf' }), name);
+}
+
+/* ---------------------------------- RTF ----------------------------------- */
+
+function bytesToHex(bytes) {
+  const table = [];
+  for (let i = 0; i < 256; i += 1) table.push(i.toString(16).padStart(2, '0'));
+  const parts = [];
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    const slice = bytes.subarray(i, i + chunk);
+    let text = '';
+    for (let k = 0; k < slice.length; k += 1) text += table[slice[k]];
+    parts.push(text);
+  }
+  return parts.join('');
+}
+
+/**
+ * Word-compatible RTF: one JPEG page per sheet. Word opens RTF natively and
+ * can save it as .docx, so this works even when a .docx package is refused.
+ */
+export async function exportRtf(student, work, sizeKey = 'md') {
+  if (!work.length) return;
+  const pages = buildPages(student, work, sizeKey);
+  const contentW = 10772; // 19 cm in twips
+
+  const chunks = [
+    '{\\rtf1\\ansi\\deff0',
+    '{\\fonttbl{\\f0\\fswiss Calibri;}}',
+    '\\paperw11906\\paperh16838\\margl567\\margr567\\margt567\\margb567',
+  ];
+
+  pages.forEach((canvas, i) => {
+    const bytes = dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.9));
+    const height = Math.round((contentW * canvas.height) / canvas.width);
+    chunks.push(
+      `{\\pict\\jpegblip\\picw${canvas.width}\\pich${canvas.height}` +
+        `\\picwgoal${contentW}\\pichgoal${height}`,
+    );
+    chunks.push(bytesToHex(bytes));
+    chunks.push('}');
+    if (i < pages.length - 1) chunks.push('\\page');
+  });
+  chunks.push('}');
+
+  const name = `passage-${student.name || 'student'}-${new Date().toISOString().slice(0, 10)}.rtf`
+    .replace(/[^a-z0-9.\-]+/gi, '-')
+    .replace(/-+/g, '-');
+  saveBlob(new Blob([chunks.join('\n')], { type: 'application/rtf' }), name);
 }
