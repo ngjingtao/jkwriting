@@ -2,7 +2,7 @@
 // Chinese character; the strokes are normalised polylines (0..1) exactly as
 // the practice canvas records them, so the review page can redraw them.
 
-import { dbState, dbSaveWork, dbListWork, dbDeleteWork, WORK_LIMIT } from './db.js';
+import { dbState, dbSaveWork, dbListWork, dbDeleteWork, dbListSessions, WORK_LIMIT } from './db.js';
 import { isStudentId } from './students.js';
 
 const MAX_STROKES = 16;
@@ -80,11 +80,18 @@ export async function listWork(student, limit = 60, before = null, session = nul
   const cleanSession = /^[a-z0-9-]{6,40}$/i.test(String(session || '')) ? String(session) : null;
   const rows = await dbListWork(
     student,
-    Math.min(400, Math.max(1, Number(limit) || 60)),
+    Math.min(2000, Math.max(1, Number(limit) || 60)),
     before,
     cleanSession,
   );
   return { stored: true, db: true, work: rows };
+}
+
+export async function listSessions(student, limit = 50) {
+  if (!isStudentId(student)) throw Object.assign(new Error('bad_student'), { status: 400 });
+  if (!dbState.enabled) return { stored: false, db: false, sessions: [] };
+  const sessions = await dbListSessions(student, Math.min(100, Math.max(1, Number(limit) || 50)));
+  return { stored: true, db: true, sessions };
 }
 
 export async function clearWork(student, id = null) {

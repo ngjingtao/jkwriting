@@ -104,7 +104,7 @@ async function main() {
     const [students, data] = await Promise.all([
       fetch('/api/students', { cache: 'no-store' }).then((r) => r.json()),
       fetch(
-        `/api/work?student=${encodeURIComponent(studentId)}&session=${encodeURIComponent(session)}&limit=400`,
+        `/api/work?student=${encodeURIComponent(studentId)}&session=${encodeURIComponent(session)}&limit=2000`,
         { cache: 'no-store' },
       ).then((r) => r.json()),
     ]);

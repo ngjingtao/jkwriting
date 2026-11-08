@@ -96,26 +96,20 @@ function setSize(size) {
   currentSize = size;
   params.set('size', String(size));
   history.replaceState(null, '', `${location.pathname}?${params.toString()}`);
-  renderStudent(rendered.student, rendered.work);
+  renderStudent(rendered.student, rendered.work, rendered.sessions);
 }
 
-function renderStudent(student, work) {
-  rendered = { student, work };
+function renderStudent(student, work, sessions = []) {
+  rendered = { student, work, sessions };
   const dates = work.map((w) => w.ts).filter(Boolean);
   const from = dates.length ? fmtDay(Math.min(...dates)) : '';
   const to = dates.length ? fmtDay(Math.max(...dates)) : '';
   const range = from && to ? (from === to ? from : `${from} – ${to}`) : '';
 
-  const bySession = new Map();
-  for (const item of work) {
-    if (!item.session) continue;
-    if (!bySession.has(item.session)) bySession.set(item.session, []);
-    bySession.get(item.session).push(item);
-  }
-  const whole = [...bySession.entries()]
-    .filter(([, items]) => items.length > 1 && items.some((i) => i.kind === 'passage'))
-    .map(([id, items]) => ({ id, items: items.slice().sort((a, b) => a.ts - b.ts) }));
-  const wholeIds = new Set(whole.map((w) => w.id));
+  // The summary endpoint counts every saved character, not just the page we
+  // fetched, so a long passage is not truncated to the latest page.
+  const whole = (sessions || []).filter((session) => session.n > 1);
+  const wholeIds = new Set(whole.map((session) => session.session));
 
   const wholeSection = whole.length
     ? el(
@@ -125,31 +119,32 @@ function renderStudent(student, work) {
         el(
           'div',
           { class: 'r-whole-list' },
-          ...whole.map((group) => {
+          ...whole.map((session) => {
             const strip = el('div', { class: 'r-whole-strip' });
-            for (const item of group.items.slice(0, 5)) {
+            const previews = work
+              .filter((item) => item.session === session.session)
+              .sort((a, b) => a.ts - b.ts)
+              .slice(0, 5);
+            for (const item of previews) {
               const canvas = el('canvas');
               drawWork(canvas, item, { size: 90, guide: false });
               strip.append(canvas);
             }
-            const avg = Math.round(
-              group.items.reduce((sum, i) => sum + (i.pct || 0), 0) / group.items.length,
-            );
             return el(
               'a',
               {
                 class: 'r-whole-card',
-                href: `/passage?student=${encodeURIComponent(student.id)}&session=${encodeURIComponent(group.id)}`,
+                href: `/passage?student=${encodeURIComponent(student.id)}&session=${encodeURIComponent(session.session)}`,
               },
               strip,
               el(
                 'span',
                 { class: 'r-whole-info' },
-                el('span', { class: 'r-whole-title' }, group.items[0].setName || 'Passage'),
+                el('span', { class: 'r-whole-title' }, session.setName || 'Passage'),
                 el(
                   'span',
                   { class: 'r-whole-meta' },
-                  `${group.items.length} characters · ${avg}% · ${fmtDate(group.items[group.items.length - 1].ts)}`,
+                  `${session.n} characters · ${session.pct || 0}% · ${fmtDate(session.lastTs)}`,
                 ),
                 el('span', { class: 'r-whole-open' }, 'Open the whole passage →'),
               ),
@@ -232,10 +227,19 @@ async function main() {
   }
   const student = students.find((s) => s.id === id) || { id, name: 'Student' };
   try {
-    const data = await fetchJson(`/api/work?student=${encodeURIComponent(id)}&limit=${limit}`);
-    renderStudent(student, Array.isArray(data.work) ? data.work : []);
+    const [data, summary] = await Promise.all([
+      fetchJson(`/api/work?student=${encodeURIComponent(id)}&limit=${limit}`),
+      fetchJson(`/api/sessions?student=${encodeURIComponent(id)}&limit=60`).catch(() => ({
+        sessions: [],
+      })),
+    ]);
+    renderStudent(
+      student,
+      Array.isArray(data.work) ? data.work : [],
+      Array.isArray(summary.sessions) ? summary.sessions : [],
+    );
   } catch {
-    renderStudent(student, []);
+    renderStudent(student, [], []);
   }
 }
 

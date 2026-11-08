@@ -61,7 +61,9 @@ export class Practice {
     this._pendingAdvance = 0;
     this.resume = resume;
     this._finished = false;
+    // Resuming keeps the original session, so a long passage stays one run.
     this.sessionId =
+      resume?.sessionId ||
       globalThis.crypto?.randomUUID?.() ||
       `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
   }
@@ -298,6 +300,7 @@ export class Practice {
   _saveSession() {
     if (this._destroyed || this._finished || !this.tokens.length) return;
     saveSession({
+      sessionId: this.sessionId,
       setId: this.set?.id || '',
       itemText: this.item?.text || '',
       name: this.setName || '',

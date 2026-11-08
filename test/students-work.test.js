@@ -192,3 +192,38 @@ test('work is grouped by session for a passage', async () => {
     );
   });
 });
+
+test('the session summary counts every character', async () => {
+  await withDb(async () => {
+    const student = await students.addStudent('Summary Kid');
+    const session = 'sum-session-1';
+    for (let i = 0; i < 15; i += 1) {
+      await work.saveWork({
+        student: student.id,
+        session,
+        ts: 1000 + i,
+        token: '字',
+        unit: '字',
+        kind: 'passage',
+        pct: 80,
+        strokes: [stroke],
+      });
+    }
+    await work.saveWork({
+      student: student.id,
+      session: 'other-session',
+      ts: 5000,
+      token: 'cat',
+      unit: 'c',
+      kind: 'latin',
+      strokes: [stroke],
+    });
+
+    const { sessions } = await work.listSessions(student.id);
+    assert.equal(sessions.length, 2);
+    const summary = sessions.find((s) => s.session === session);
+    assert.equal(summary.n, 15);
+    assert.equal(summary.pct, 80);
+    assert.equal(summary.kind, 'passage');
+  });
+});

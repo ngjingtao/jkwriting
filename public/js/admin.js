@@ -15,6 +15,7 @@ const state = {
   students: null,
   studentId: null,
   work: [],
+  sessions: [],
   workFor: null,
   storage: 'file',
   defaultPin: false,
@@ -511,15 +512,9 @@ function studentsTab() {
       grid.append(h('div', { class: 'empty' }, 'No handwriting yet — finish a letter in the app.'));
       return;
     }
-    const bySession = new Map();
-    for (const item of work) {
-      if (!item.session) continue;
-      if (!bySession.has(item.session)) bySession.set(item.session, []);
-      bySession.get(item.session).push(item);
-    }
-    const passages = [...bySession.entries()].filter(
-      ([, items]) => items.length > 1 && items.some((i) => i.kind === 'passage'),
-    );
+    // The session summary carries the full character count, even when the
+    // thumbnail list below only holds the most recent page of work.
+    const passages = (state.sessions || []).filter((session) => session.n > 1);
 
     const panel = grid.parentElement;
     panel?.querySelector('.work-sessions')?.remove();
@@ -528,25 +523,24 @@ function studentsTab() {
         'div',
         { class: 'work-sessions' },
         h('h4', {}, 'Whole passages'),
-        ...passages.map(([id, items]) => {
-          const ordered = items.slice().sort((a, b) => a.ts - b.ts);
-          return h(
+        ...passages.map((session) =>
+          h(
             'a',
             {
               class: 'work-session',
-              href: `/passage?student=${encodeURIComponent(student.id)}&session=${encodeURIComponent(id)}`,
+              href: `/passage?student=${encodeURIComponent(student.id)}&session=${encodeURIComponent(session.session)}`,
               target: '_blank',
               rel: 'noopener',
             },
-            h('span', { class: 'ws-name' }, ordered[0].setName || 'Passage'),
+            h('span', { class: 'ws-name' }, session.setName || 'Passage'),
             h(
               'span',
               { class: 'ws-meta' },
-              `${ordered.length} characters · ${shortDate(ordered[ordered.length - 1].ts)}`,
+              `${session.n} characters · ${session.pct || 0}% · ${shortDate(session.lastTs)}`,
             ),
             h('span', { class: 'ws-open' }, 'Open / print →'),
-          );
-        }),
+          ),
+        ),
       );
       panel.insertBefore(box, grid);
     }
@@ -582,15 +576,19 @@ function studentsTab() {
       return;
     }
     try {
-      const res = await fetch(`/api/work?student=${encodeURIComponent(id)}&limit=60`, {
-        cache: 'no-store',
-      });
-      if (!res.ok) throw new Error('work');
-      const data = await res.json();
+      const [workRes, sessionRes] = await Promise.all([
+        fetch(`/api/work?student=${encodeURIComponent(id)}&limit=60`, { cache: 'no-store' }),
+        fetch(`/api/sessions?student=${encodeURIComponent(id)}&limit=60`, { cache: 'no-store' }),
+      ]);
+      if (!workRes.ok) throw new Error('work');
+      const data = await workRes.json();
       state.work = Array.isArray(data.work) ? data.work : [];
+      const summary = sessionRes.ok ? await sessionRes.json() : { sessions: [] };
+      state.sessions = Array.isArray(summary.sessions) ? summary.sessions : [];
       state.workFor = id;
     } catch {
       state.work = [];
+      state.sessions = [];
     }
     paintWork();
   }

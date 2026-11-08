@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig, saveConfig, resetConfig, syncState } from './store.js';
 import { loadProgress, saveProgress } from './progress-store.js';
 import { listStudents, addStudent, renameStudent, removeStudent } from './students.js';
-import { saveWork, listWork, clearWork } from './work.js';
+import { saveWork, listWork, clearWork, listSessions } from './work.js';
 import { getHanzi } from './hanzi.js';
 import {
   checkPin,
@@ -136,6 +136,15 @@ app.get('/api/work', async (req, res, next) => {
         req.query.session ? String(req.query.session) : null,
       ),
     );
+  } catch (err) {
+    sendError(res, err, next);
+  }
+});
+
+app.get('/api/sessions', async (req, res, next) => {
+  try {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(await listSessions(String(req.query.student || ''), req.query.limit));
   } catch (err) {
     sendError(res, err, next);
   }

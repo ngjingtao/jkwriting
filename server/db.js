@@ -9,7 +9,7 @@ import dns from 'node:dns/promises';
 
 const CONFIG_ID = 1;
 const PROGRESS_LIMIT = 800;
-const WORK_LIMIT = 600;
+const WORK_LIMIT = 1200;
 
 export const dbState = {
   enabled: false,
@@ -331,6 +331,33 @@ export async function dbDeleteWork(student, id = null) {
     return;
   }
   await q('delete from wf_work where student = $1 and id = $2', [student, id]);
+}
+
+export async function dbListSessions(student, limit = 50) {
+  const { rows } = await q(
+    `select session,
+            max(set_name) as set_name,
+            max(kind) as kind,
+            count(*)::int as n,
+            min(ts) as first_ts,
+            max(ts) as last_ts,
+            round(avg(pct))::int as pct
+       from wf_work
+      where student = $1 and session is not null
+      group by session
+      order by max(ts) desc
+      limit $2`,
+    [student, limit],
+  );
+  return rows.map((row) => ({
+    session: row.session,
+    setName: row.set_name || '',
+    kind: row.kind || 'passage',
+    n: row.n,
+    firstTs: Number(row.first_ts),
+    lastTs: Number(row.last_ts),
+    pct: row.pct,
+  }));
 }
 
 /** Close the pool (used by tests and by graceful shutdown). */
