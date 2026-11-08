@@ -1,4 +1,5 @@
 import { drawWork } from './inkrender.js';
+import { downloadDocx } from './passage-export.js';
 
 const root = document.getElementById('passage');
 const params = new URLSearchParams(location.search);
@@ -75,6 +76,11 @@ function render(student, work) {
       'div',
       { class: 'r-actions' },
       el('button', { class: 'r-btn', onclick: () => window.print(), text: 'Print' }),
+      el('button', {
+        class: 'r-btn ghost',
+        onclick: () => downloadDocx(student, work),
+        text: 'Word (.docx)',
+      }),
       el(
         'a',
         { class: 'r-btn ghost', href: `/results?student=${encodeURIComponent(student.id)}`, text: 'All writing' },
