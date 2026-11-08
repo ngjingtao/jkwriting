@@ -1,5 +1,5 @@
 import { drawWork } from './inkrender.js';
-import { buildDocx, zip } from './docx.js';
+import { zip } from './docx.js';
 import { buildPdf, dataUrlToBytes } from './pdf.js';
 
 /* ------------------------------ Word export ------------------------------ */
@@ -110,28 +110,72 @@ export function buildPages(student, work, sizeKey = 'md') {
   return pages;
 }
 
+let docxLib = null;
+
+/** Load the bundled Word library on demand (only needed for .docx export). */
+async function loadDocxLib() {
+  if (docxLib) return docxLib;
+  if (!globalThis.docx) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = '/vendor/docx.umd.js';
+      script.onload = resolve;
+      script.onerror = () => reject(new Error('docx'));
+      document.head.append(script);
+    });
+  }
+  docxLib = globalThis.docx;
+  return docxLib;
+}
+
 export async function downloadDocx(student, work, sizeKey = 'md') {
   if (!work.length) return;
   const pages = buildPages(student, work, sizeKey);
-  const pngs = [];
-  for (const canvas of pages) {
+  const lib = await loadDocxLib();
+  const { Document, Packer, Paragraph, ImageRun, PageBreak } = lib;
+
+  const children = [];
+  for (let i = 0; i < pages.length; i += 1) {
+    const canvas = pages[i];
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
-    pngs.push(new Uint8Array(await blob.arrayBuffer()));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const width = 700; // 18.5 cm at 96 dpi
+    children.push(
+      new Paragraph({
+        spacing: { before: 0, after: 0 },
+        children: [
+          new ImageRun({
+            type: 'png',
+            data: bytes,
+            transformation: { width, height: Math.round((width * canvas.height) / canvas.width) },
+          }),
+        ],
+      }),
+    );
+    if (i < pages.length - 1) children.push(new Paragraph({ children: [new PageBreak()] }));
   }
-  const bytes = buildDocx({ pages: pngs, widthPx: PAGE_W, heightPx: PAGE_H });
+
+  const doc = new Document({
+    creator: 'Writing Fun',
+    title: `${student.name || 'Student'} — passage`,
+    sections: [
+      {
+        properties: {
+          page: {
+            size: { width: 11906, height: 16838 },
+            margin: { top: 567, right: 567, bottom: 567, left: 567 },
+          },
+        },
+        children,
+      },
+    ],
+  });
+
+  const out = await Packer.toBlob(doc);
   const name = `passage-${student.name || 'student'}-${new Date().toISOString().slice(0, 10)}.docx`
     .replace(/[^a-z0-9.\-]+/gi, '-')
     .replace(/-+/g, '-');
-  const blob = new Blob([bytes], {
-    type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = name;
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  saveBlob(out, name);
 }
 
 
