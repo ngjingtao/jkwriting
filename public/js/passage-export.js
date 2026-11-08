@@ -1,5 +1,5 @@
 import { drawWork } from './inkrender.js';
-import { buildDocx } from './docx.js';
+import { buildDocx, zip } from './docx.js';
 
 /* ------------------------------ Word export ------------------------------ */
 
@@ -121,3 +121,70 @@ export async function downloadDocx(student, work) {
 }
 
 
+
+/* --------------------------- one file per character ------------------------ */
+
+const TILE = 512;
+
+function safeName(text, fallback) {
+  const cleaned = String(text || '')
+    .replace(/[\\/:*?"<>|\u0000-\u001f]/g, '_')
+    .trim();
+  return cleaned || fallback;
+}
+
+function saveBlob(blob, name) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+
+/** Download a ZIP with one transparent PNG per written character. */
+export async function exportCharactersZip(student, work) {
+  if (!work.length) return;
+  const files = [];
+  const rows = [['order', 'character', 'score', 'time']];
+
+  for (let i = 0; i < work.length; i += 1) {
+    const item = work[i];
+    const canvas = document.createElement('canvas');
+    drawWork(canvas, item, {
+      size: TILE,
+      guide: false,
+      grid: false,
+      paper: false,
+    });
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    const order = String(i + 1).padStart(3, '0');
+    files.push({ name: `${order}-${safeName(item.unit, 'char')}.png`, data: bytes });
+    rows.push([order, item.unit || '', item.pct ?? '', new Date(item.ts).toISOString()]);
+  }
+
+  const csv = rows
+    .map((row) => row.map((value) => `"${String(value ?? '').replace(/"/g, '""')}"`).join(','))
+    .join('\r\n');
+  files.push({ name: 'index.csv', data: new TextEncoder().encode(csv) });
+  files.push({
+    name: 'readme.txt',
+    data: new TextEncoder().encode(
+      [
+        `${student.name || 'Student'} — ${work[0]?.setName || 'passage'}`,
+        `${work.length} characters, one transparent PNG each, in reading order.`,
+        'File names: 001-<character>.png, 002-<character>.png, …',
+        'index.csv lists the order, character, score and time.',
+        `Exported ${new Date().toLocaleString()}.`,
+      ].join('\n'),
+    ),
+  });
+
+  const bytes = zip(files);
+  const name = `passage-${student.name || 'student'}-${new Date().toISOString().slice(0, 10)}-characters.zip`
+    .replace(/[^a-z0-9.\-]+/gi, '-')
+    .replace(/-+/g, '-');
+  saveBlob(new Blob([bytes], { type: 'application/zip' }), name);
+}

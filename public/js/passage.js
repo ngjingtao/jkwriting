@@ -1,5 +1,5 @@
 import { drawWork } from './inkrender.js';
-import { downloadDocx } from './passage-export.js';
+import { downloadDocx, exportCharactersZip } from './passage-export.js';
 
 const root = document.getElementById('passage');
 const params = new URLSearchParams(location.search);
@@ -80,6 +80,11 @@ function render(student, work) {
         class: 'r-btn ghost',
         onclick: () => downloadDocx(student, work),
         text: 'Word (.docx)',
+      }),
+      el('button', {
+        class: 'r-btn ghost',
+        onclick: () => exportCharactersZip(student, work),
+        text: 'Characters (.zip)',
       }),
       el(
         'a',

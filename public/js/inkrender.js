@@ -42,12 +42,14 @@ export function drawWork(canvas, item, options = {}) {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, css, css);
 
-  // paper
-  ctx.fillStyle = PAPER;
-  ctx.fillRect(0, 0, css, css);
-  ctx.strokeStyle = 'rgba(31, 42, 55, 0.08)';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(0.5, 0.5, css - 1, css - 1);
+  // paper (skip for transparent character tiles)
+  if (options.paper !== false) {
+    ctx.fillStyle = PAPER;
+    ctx.fillRect(0, 0, css, css);
+    ctx.strokeStyle = 'rgba(31, 42, 55, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(0.5, 0.5, css - 1, css - 1);
+  }
 
   const pad = css * 0.06;
   const size = css - pad * 2;
