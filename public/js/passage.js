@@ -1,5 +1,5 @@
 import { drawWork } from './inkrender.js';
-import { downloadDocx, exportCharactersZip } from './passage-export.js';
+import { downloadDocx, exportCharactersZip, EXPORT_SIZES } from './passage-export.js';
 
 const root = document.getElementById('passage');
 const params = new URLSearchParams(location.search);
@@ -57,6 +57,26 @@ function render(student, work) {
     );
   }
 
+  const savedSize = localStorage.getItem('wf.exportSize') || 'md';
+  const sizeSelect = el(
+    'select',
+    {
+      class: 'r-select',
+      'aria-label': 'Export size',
+      onchange: (event) => localStorage.setItem('wf.exportSize', event.target.value),
+    },
+    ...Object.entries(EXPORT_SIZES).map(([key, preset]) =>
+      el(
+        'option',
+        {
+          value: key,
+          selected: key === savedSize,
+        },
+        `${preset.name} · ${preset.cols}/row · ${preset.tile}px`,
+      ),
+    ),
+  );
+
   const head = el(
     'header',
     { class: 'r-head' },
@@ -76,14 +96,15 @@ function render(student, work) {
       'div',
       { class: 'r-actions' },
       el('button', { class: 'r-btn', onclick: () => window.print(), text: 'Print' }),
+      sizeSelect,
       el('button', {
         class: 'r-btn ghost',
-        onclick: () => downloadDocx(student, work),
+        onclick: () => downloadDocx(student, work, sizeSelect.value),
         text: 'Word (.docx)',
       }),
       el('button', {
         class: 'r-btn ghost',
-        onclick: () => exportCharactersZip(student, work),
+        onclick: () => exportCharactersZip(student, work, sizeSelect.value),
         text: 'Characters (.zip)',
       }),
       el(

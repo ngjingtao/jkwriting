@@ -17,12 +17,25 @@ const fmtDate = (ts) =>
 const PAGE_W = 1240;
 const PAGE_H = 1754;
 const PAGE_MARGIN = 60;
-const COLS = 8;
 const GAP = 10;
 
-export function buildPages(student, work) {
-  const cell = Math.floor((PAGE_W - PAGE_MARGIN * 2 - GAP * (COLS - 1)) / COLS);
-  const labelH = 22;
+/** Export presets: characters per row, caption size, PNG resolution. */
+export const EXPORT_SIZES = {
+  sm: { cols: 10, label: 14, tile: 256, name: 'Small' },
+  md: { cols: 8, label: 17, tile: 512, name: 'Medium' },
+  lg: { cols: 6, label: 22, tile: 768, name: 'Large' },
+  xl: { cols: 4, label: 28, tile: 1024, name: 'Extra large' },
+};
+
+export function exportSize(key) {
+  return EXPORT_SIZES[key] || EXPORT_SIZES.md;
+}
+
+export function buildPages(student, work, sizeKey = 'md') {
+  const preset = exportSize(sizeKey);
+  const cols = preset.cols;
+  const cell = Math.floor((PAGE_W - PAGE_MARGIN * 2 - GAP * (cols - 1)) / cols);
+  const labelH = preset.label + 5;
   const rowH = cell + labelH + GAP;
   const headFirst = 150;
   const headNext = 74;
@@ -36,7 +49,7 @@ export function buildPages(student, work) {
     pageNo += 1;
     const first = pageNo === 1;
     const rows = first ? rowsFirst : rowsNext;
-    const perPage = rows * COLS;
+    const perPage = rows * cols;
     const slice = work.slice(index, index + perPage);
     index += slice.length;
 
@@ -72,8 +85,8 @@ export function buildPages(student, work) {
 
     const top = PAGE_MARGIN + (first ? headFirst : headNext);
     slice.forEach((item, i) => {
-      const col = i % COLS;
-      const row = Math.floor(i / COLS);
+      const col = i % cols;
+      const row = Math.floor(i / cols);
       const x = PAGE_MARGIN + col * (cell + GAP);
       const y = top + row * rowH;
 
@@ -82,8 +95,8 @@ export function buildPages(student, work) {
       ctx.drawImage(tile, x, y, cell, cell);
 
       ctx.fillStyle = '#6b7280';
-      ctx.font = '600 17px sans-serif';
-      ctx.fillText(item.unit || '', x + cell / 2, y + cell + 18);
+      ctx.font = `600 ${preset.label}px sans-serif`;
+      ctx.fillText(item.unit || '', x + cell / 2, y + cell + preset.label + 2);
     });
 
     ctx.fillStyle = '#9ca3af';
@@ -96,9 +109,9 @@ export function buildPages(student, work) {
   return pages;
 }
 
-export async function downloadDocx(student, work) {
+export async function downloadDocx(student, work, sizeKey = 'md') {
   if (!work.length) return;
-  const pages = buildPages(student, work);
+  const pages = buildPages(student, work, sizeKey);
   const pngs = [];
   for (const canvas of pages) {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'));
@@ -124,7 +137,6 @@ export async function downloadDocx(student, work) {
 
 /* --------------------------- one file per character ------------------------ */
 
-const TILE = 512;
 
 function safeName(text, fallback) {
   const cleaned = String(text || '')
@@ -144,8 +156,10 @@ function saveBlob(blob, name) {
 }
 
 /** Download a ZIP with one transparent PNG per written character. */
-export async function exportCharactersZip(student, work) {
+export async function exportCharactersZip(student, work, sizeKey = 'md') {
   if (!work.length) return;
+  const preset = exportSize(sizeKey);
+  const tile = preset.tile;
   const files = [];
   const rows = [['order', 'character', 'score', 'time']];
 
@@ -153,7 +167,7 @@ export async function exportCharactersZip(student, work) {
     const item = work[i];
     const canvas = document.createElement('canvas');
     drawWork(canvas, item, {
-      size: TILE,
+      size: tile,
       guide: false,
       grid: false,
       paper: false,
@@ -174,7 +188,7 @@ export async function exportCharactersZip(student, work) {
     data: new TextEncoder().encode(
       [
         `${student.name || 'Student'} — ${work[0]?.setName || 'passage'}`,
-        `${work.length} characters, one transparent PNG each, in reading order.`,
+        `${work.length} characters, one transparent ${tile} x ${tile} PNG each, in reading order.`,
         'File names: 001-<character>.png, 002-<character>.png, …',
         'index.csv lists the order, character, score and time.',
         `Exported ${new Date().toLocaleString()}.`,
