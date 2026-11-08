@@ -1,5 +1,6 @@
 import { drawWork } from './inkrender.js';
 import { buildDocx, zip } from './docx.js';
+import { buildPdf, dataUrlToBytes } from './pdf.js';
 
 /* ------------------------------ Word export ------------------------------ */
 
@@ -201,4 +202,20 @@ export async function exportCharactersZip(student, work, sizeKey = 'md') {
     .replace(/[^a-z0-9.\-]+/gi, '-')
     .replace(/-+/g, '-');
   saveBlob(new Blob([bytes], { type: 'application/zip' }), name);
+}
+
+/** Download the same composed pages as a PDF (opens anywhere). */
+export async function exportPdf(student, work, sizeKey = 'md') {
+  if (!work.length) return;
+  const pages = buildPages(student, work, sizeKey);
+  const images = pages.map((canvas) => ({
+    bytes: dataUrlToBytes(canvas.toDataURL('image/jpeg', 0.92)),
+    width: canvas.width,
+    height: canvas.height,
+  }));
+  const bytes = buildPdf(images);
+  const name = `passage-${student.name || 'student'}-${new Date().toISOString().slice(0, 10)}.pdf`
+    .replace(/[^a-z0-9.\-]+/gi, '-')
+    .replace(/-+/g, '-');
+  saveBlob(new Blob([bytes], { type: 'application/pdf' }), name);
 }

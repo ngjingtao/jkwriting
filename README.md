@@ -148,7 +148,8 @@ Every completed letter/character is stored as the child’s real ink:
 - **Whole passages**: a passage written in one run is grouped under **Whole passages** (top of the review page and in the Students tab). Open it for a sheet with every character the child wrote, in order, plus the text assembled from their writing — ready to print or save as PDF (`/passage?student=<id>&session=<id>`).
 - **Word (.docx)**: the passage sheet has a **Word (.docx)** button. It builds a real Word document — A4, 8 characters per row, every page as a crisp 1240 × 1754 image — so you can open it in Word, Pages or Google Docs and print it, or send it on. The file is named `passage-<student>-<date>.docx`.
 - **Characters (.zip)**: one **transparent PNG per written character**, named in reading order (`001-所.png`, `002-有.png`, …), plus `index.csv` (order, character, score, time) and a short readme. Drop them into Word and arrange them however you like.
-- **Export size** (next to those buttons) sets both formats: **Small** 10 per row / 256 px, **Medium** 8 per row / 512 px, **Large** 6 per row / 768 px, **Extra large** 4 per row / 1024 px. The choice is remembered on the device.
+- **PDF**: the same composed pages as a print-ready PDF — the safest option for printing or sending; use “Save to Files / Print” on the iPad.
+- **Export size** (next to those buttons) sets every format: **Small** 10 per row / 256 px, **Medium** 8 per row / 512 px, **Large** 6 per row / 768 px, **Extra large** 4 per row / 1024 px. The choice is remembered on the device.
 - New handwriting queues in the browser when offline and uploads automatically when the connection returns.
 - **Back is safe**: leaving a passage (back button, switching apps, closing the tab) saves the place; opening the same passage again offers **Resume** or **Start over**. A finished passage clears the saved place.
 
@@ -260,8 +261,9 @@ public/
     inkrender.js  Draws saved handwriting into a canvas
     results.js    Printable review page per student
     passage.js    One sheet with a whole passage's handwriting
-    passage-export.js  Renders the Word pages for a passage
+    passage-export.js  Renders the Word/PDF pages for a passage
     docx.js       Tiny .docx writer (ZIP + OOXML, no dependencies)
+    pdf.js        Tiny PDF writer (JPEG pages, no dependencies)
     session.js    Remembers where a child stopped
     sound.js      WebAudio feedback
   css/

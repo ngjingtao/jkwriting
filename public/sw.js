@@ -1,6 +1,6 @@
 /* Offline shell for the iPad home-screen app.
    Bump VERSION when you deploy changed app files. */
-const VERSION = 'writing-fun-v38';
+const VERSION = 'writing-fun-v39';
 const SHELL = [
   '/',
   '/index.html',
@@ -41,6 +41,7 @@ const SHELL = [
   '/js/passage.js',
   '/js/passage-export.js',
   '/js/docx.js',
+  '/js/pdf.js',
 ];
 
 self.addEventListener('install', (event) => {

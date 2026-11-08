@@ -105,16 +105,43 @@ const CONTENT_TYPES = (pages) => `<?xml version="1.0" encoding="UTF-8" standalon
 <Default Extension="xml" ContentType="application/xml"/>
 <Default Extension="png" ContentType="image/png"/>
 <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
+<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
+<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/>
+<Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>
 </Types>`;
+
+const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri"/><w:sz w:val="22"/></w:rPr></w:rPrDefault>
+<w:pPrDefault><w:pPr><w:spacing w:after="0"/></w:pPr></w:pPrDefault></w:docDefaults>
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+</w:styles>`;
+
+const coreXml = (when) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+<dc:title>Handwriting passage</dc:title>
+<dc:creator>Writing Fun</dc:creator>
+<cp:lastModifiedBy>Writing Fun</cp:lastModifiedBy>
+<dcterms:created xsi:type="dcterms:W3CDTF">${when}</dcterms:created>
+<dcterms:modified xsi:type="dcterms:W3CDTF">${when}</dcterms:modified>
+</cp:coreProperties>`;
+
+const APP_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
+<Application>Writing Fun</Application>
+</Properties>`;
 
 const ROOT_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
+<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>`;
 
 const DOC_RELS = (pages) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
 ${Array.from({ length: pages }, (_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${i + 1}.png"/>`).join('\n')}
+<Relationship Id="rId${pages + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>`;
 
 function documentXml(pages, cx, cy) {
@@ -154,6 +181,9 @@ export function buildDocx({ pages, widthPx = 1240, heightPx = 1754 }) {
     { name: '_rels/.rels', data: encoder.encode(ROOT_RELS) },
     { name: 'word/document.xml', data: encoder.encode(documentXml(pages.length, contentCx, contentCy)) },
     { name: 'word/_rels/document.xml.rels', data: encoder.encode(DOC_RELS(pages.length)) },
+    { name: 'word/styles.xml', data: encoder.encode(STYLES) },
+    { name: 'docProps/core.xml', data: encoder.encode(coreXml(new Date().toISOString().replace(/\.\d+Z$/, 'Z'))) },
+    { name: 'docProps/app.xml', data: encoder.encode(APP_XML) },
     ...pages.map((png, i) => ({ name: `word/media/image${i + 1}.png`, data: png })),
   ];
   return zip(files);
